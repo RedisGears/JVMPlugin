@@ -2313,7 +2313,7 @@ error:
     return NULL;
 }
 
-static bool JVM_Filter(ExecutionCtx* rctx, Record *data, void* arg){
+static int JVM_Filter(ExecutionCtx* rctx, Record *data, void* arg){
     JVMRunSession* oldSession;
     JVMFlatExecutionSession* s = RedisGears_GetFlatExecutionPrivateData(rctx);
     JVM_ThreadLocalData* jvm_tld = JVM_GetThreadLocalData(s->session, &oldSession);
@@ -2335,10 +2335,10 @@ static bool JVM_Filter(ExecutionCtx* rctx, Record *data, void* arg){
 
     JVM_ThreadLocalDataRestor(jvm_tld, oldSession);
 
-    return res;
+    return res ? RedisGears_RecordSuccess : RedisGears_RecordFailed;
 }
 
-static void JVM_Foreach(ExecutionCtx* rctx, Record *data, void* arg){
+static int JVM_Foreach(ExecutionCtx* rctx, Record *data, void* arg){
     JVMRunSession* oldSession;
     JVMFlatExecutionSession* s = RedisGears_GetFlatExecutionPrivateData(rctx);
     JVM_ThreadLocalData* jvm_tld = JVM_GetThreadLocalData(s->session, &oldSession);
@@ -2359,6 +2359,8 @@ static void JVM_Foreach(ExecutionCtx* rctx, Record *data, void* arg){
     JVM_PopFrame(env);
 
     JVM_ThreadLocalDataRestor(jvm_tld, oldSession);
+
+    return RedisGears_RecordSuccess;
 }
 
 static char* JVM_Extractor(ExecutionCtx* rctx, Record *data, void* arg, size_t* len){

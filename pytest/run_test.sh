@@ -17,13 +17,13 @@ JVM_OPTIONS+="../../gears_runtime/target/gear_runtime-0.0.3-SNAPSHOT-jar-with-de
 JVM_PATH=/var/opt/redislabs/modules/rg/999999/deps/jdk-14.0.1+7-jre/lib/server/
 
 echo oss
-LD_LIBRARY_PATH=$JVM_PATH RLTest --module ../redisgears.so --module-args "PluginsDirectory ../../src/ JvmOptions $JVM_OPTIONS" --clear-logs "$@"
+LD_LIBRARY_PATH=$JVM_PATH python2.7 -m RLTest --module ../redisgears.so --module-args "PluginsDirectory ../../src/ JvmOptions $JVM_OPTIONS" --clear-logs "$@"
 
 echo cluster 1 shard
-LD_LIBRARY_PATH=$JVM_PATH RLTest --module ../redisgears.so --module-args "PluginsDirectory ../../src/ JvmOptions $JVM_OPTIONS" --clear-logs --env oss-cluster --shards-count 1 "$@"
+LD_LIBRARY_PATH=$JVM_PATH python2.7 -m RLTest --module ../redisgears.so --module-args "PluginsDirectory ../../src/ JvmOptions $JVM_OPTIONS" --clear-logs --env oss-cluster --shards-count 1 "$@"
 
 echo cluster 2 shards
-LD_LIBRARY_PATH=$JVM_PATH RLTest --module ../redisgears.so --module-args "PluginsDirectory ../../src/ JvmOptions $JVM_OPTIONS" --clear-logs --env oss-cluster --shards-count 2 "$@"
+LD_LIBRARY_PATH=$JVM_PATH python2.7 -m RLTest --module ../redisgears.so --module-args "PluginsDirectory ../../src/ JvmOptions $JVM_OPTIONS" --clear-logs --env oss-cluster --shards-count 2 "$@"
 
 echo cluster 3 shards
-LD_LIBRARY_PATH=$JVM_PATH RLTest --module ../redisgears.so --module-args "PluginsDirectory ../../src/ JvmOptions $JVM_OPTIONS" --clear-logs --env oss-cluster --shards-count 3 "$@"
+LD_LIBRARY_PATH=$JVM_PATH python2.7 -m RLTest --module ../redisgears.so --module-args "PluginsDirectory ../../src/ JvmOptions $JVM_OPTIONS" --clear-logs --env oss-cluster --shards-count 3 "$@"
