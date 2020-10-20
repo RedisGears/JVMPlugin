@@ -2335,7 +2335,7 @@ static int JVM_Filter(ExecutionCtx* rctx, Record *data, void* arg){
 
     JVM_ThreadLocalDataRestor(jvm_tld, oldSession);
 
-    return res ? RedisGears_RecordSuccess : RedisGears_RecordFailed;
+    return res ? RedisGears_StepSuccess : RedisGears_StepFailed;
 }
 
 static int JVM_Foreach(ExecutionCtx* rctx, Record *data, void* arg){
@@ -2360,7 +2360,7 @@ static int JVM_Foreach(ExecutionCtx* rctx, Record *data, void* arg){
 
     JVM_ThreadLocalDataRestor(jvm_tld, oldSession);
 
-    return RedisGears_RecordSuccess;
+    return RedisGears_StepSuccess;
 }
 
 static char* JVM_Extractor(ExecutionCtx* rctx, Record *data, void* arg, size_t* len){
