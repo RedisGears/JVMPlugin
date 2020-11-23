@@ -57,7 +57,7 @@ class Colors(object):
     def Green(data):
         return '\033[32m' + data + '\033[0m'
 
-BASE_JAR_FILE = './gears_tests/bin/gears_tests.jar'
+BASE_JAR_FILE = './gears_tests/build/gears_tests.jar'
 
 def getConnectionByEnv(env):
     conn = None

@@ -8,6 +8,7 @@ commands:
           command: |
             git submodule update --init --recursive
             ./deps/readies/bin/getpy3
+            ./deps/readies/bin/getpy2
             python3 ./deps/readies/bin/system-setup.py
 
 jobs:
@@ -27,10 +28,7 @@ jobs:
             command: ./deps/readies/bin/getredis --version 6
         - run:
             name: Install RLTest
-            command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
-        - run:
-            name: Install Tests deps
-            command: python3 -m pip install --no-cache-dir numpy scipy
+            command: python2.7 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
         - run:
             name: Tests
             command: make tests
@@ -60,10 +58,7 @@ jobs:
             command: . /opt/rh/devtoolset-8/enable; ./deps/readies/bin/getredis --version 6
         - run:
             name: Install RLTest
-            command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
-        - run:
-            name: Install Tests deps
-            command: python3 -m pip install --no-cache-dir numpy scipy
+            command: python2.7 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
         - run:
             name: Tests
             command: . /opt/rh/devtoolset-8/enable; make tests
