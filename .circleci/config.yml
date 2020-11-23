@@ -41,11 +41,6 @@ jobs:
             command: |
               yum install -y git openssh-client curl ca-certificates make tar gzip python-devel python3-devel.x86_64 unzip maven
         - run:
-            name: get pip
-            command: |
-              curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
-              python get-pip.py
-        - run:
             name: Install centos-release-scl
             command: |
               yum install -y centos-release-scl
@@ -61,6 +56,11 @@ jobs:
         - run:
             name: Install Redis
             command: . /opt/rh/devtoolset-8/enable; ./deps/readies/bin/getredis --version 6
+        - run:
+            name: get pip
+            command: |
+              curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
+              python get-pip.py
         - run:
             name: Install RLTest
             command: python2.7 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
