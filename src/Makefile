@@ -15,7 +15,7 @@ ARTIFACT_NAME=gears_jvm.so
 all: $(ARTIFACT_NAME)
 
 $(ARTIFACT_NAME): $(HEADERS) $(SOURCES)
-	gcc $(GCC_FLAGS) $(SOURCES) -shared -fpic -DREDISMODULE_EXPERIMENTAL_API \
+	gcc -std=gnu99 $(GCC_FLAGS) $(SOURCES) -shared -fpic -DREDISMODULE_EXPERIMENTAL_API \
 	-Wl,--disable-new-dtags -Wl,-rpath=$(OPEN_J9_BUILD_DIR)/lib/server \
 	-L$(OPEN_J9_BUILD_DIR)/lib/server \
 	-ljvm \

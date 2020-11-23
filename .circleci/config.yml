@@ -39,7 +39,12 @@ jobs:
         - run:
             name: Setup executor
             command: |
-              yum install -y git openssh-client curl ca-certificates make tar gzip python3-devel.x86_64 unzip python-pip maven
+              yum install -y git openssh-client curl ca-certificates make tar gzip python-devel python3-devel.x86_64 unzip maven
+        - run:
+            name: get pip
+            command: |
+              curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
+              python get-pip.py
         - run:
             name: Install centos-release-scl
             command: |
