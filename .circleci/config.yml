@@ -1,0 +1,97 @@
+version: 2.1
+
+commands: 
+  setup-automation:
+    steps:
+      - run:
+          name: Setup automation
+          command: |
+            git submodule update --init --recursive
+            ./deps/readies/bin/getpy3
+            python3 ./deps/readies/bin/system-setup.py
+
+jobs:
+  build-and-test-bionic:
+      docker:
+        - image: 'ubuntu:bionic'
+      steps:
+        - run:
+            name: Setup executor
+            command: |
+              apt-get -qq update
+              apt-get -q install -y git openssh-client curl ca-certificates make tar gzip python3-dev unzip
+        - checkout
+        - setup-automation
+        - run:
+            name: Install Redis
+            command: ./deps/readies/bin/getredis --version 6
+        - run:
+            name: Install RLTest
+            command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
+        - run:
+            name: Install Tests deps
+            command: python3 -m pip install --no-cache-dir numpy scipy
+        - run:
+            name: Tests
+            command: make tests
+  build-and-test-centos:
+      docker:
+        - image: 'centos:centos7'
+      steps:
+        - run:
+            name: Setup executor
+            command: |
+              yum install -y git openssh-client curl ca-certificates make tar gzip python3-devel.x86_64 unzip
+        - run:
+            name: Install centos-release-scl
+            command: |
+              yum install -y centos-release-scl
+        - run:
+            name: Install gcc 8
+            command: |
+              yum install -y devtoolset-8
+        - checkout
+        - setup-automation
+        - run:
+            name: Install semantic_version
+            command: python3 -m pip install --no-cache-dir semantic_version
+        - run:
+            name: Install Redis
+            command: . /opt/rh/devtoolset-8/enable; ./deps/readies/bin/getredis --version 6
+        - run:
+            name: Install RLTest
+            command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
+        - run:
+            name: Install Tests deps
+            command: python3 -m pip install --no-cache-dir numpy scipy
+        - run:
+            name: Tests
+            command: . /opt/rh/devtoolset-8/enable; make tests
+
+on-any-branch: &on-any-branch
+  filters:
+    branches:
+      only: /.*/
+    tags:
+      only: /.*/
+
+workflows:
+  version: 2
+  commit:
+    jobs:
+      - build-and-test-bionic:
+          <<: *on-any-branch
+      - build-and-test-centos:
+          <<: *on-any-branch
+
+nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - build-and-test-bionic
+      - build-and-test-centos
