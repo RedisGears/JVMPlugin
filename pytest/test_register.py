@@ -242,4 +242,13 @@ def testUnregisterCallback(env, conn, **kargs):
     env.cmd('RG.UNREGISTER', registrationId)
     env.expect('RG.PYEXECUTE', 'GB().count().run()').equal([[], []])
     
+@jvmTestDecorator()
+def testCommandOverride(env, results, errs, conn, **kargs):
+    env.assertEqual(len(errs), 0)
+    env.assertEqual(conn.execute_command('hset', 'h1', 'foo', 'bar'), 2)
+    env.assertNotEqual(conn.execute_command('hget', 'h1', 'time'), None)
 
+@jvmTestDecorator()
+def testAsyncStepInSyncExecution(env, results, errs, conn, **kargs):
+    env.assertEqual(len(errs), 0)
+    env.expect('RG.TRIGGER', 'test').error().contains('Can not create gearsFuture on sync execution')

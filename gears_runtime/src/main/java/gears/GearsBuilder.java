@@ -376,6 +376,15 @@ public class GearsBuilder<T extends Serializable>{
 	public static native Object executeArray(String[] command);
 	
 	/**
+	 * On command overriding, call the next execution that override the command or
+	 * the original command itself.
+	 * 
+	 * @param args - the command args to use
+	 * @return the command result (could be a simple String or an array or Strings depends on the command)
+	 */
+	public static native Object callNextArray(String[] args);
+	
+	/**
 	 * Write a log message to the redis log file
 	 * 
 	 * @param msg - the message to write
@@ -406,6 +415,17 @@ public class GearsBuilder<T extends Serializable>{
 	 */
 	public static Object execute(String... command) {
 		return executeArray(command);
+	}
+	
+	/**
+	 * On command overriding, call the next execution that override the command or
+	 * the original command itself.
+	 * 
+	 * @param args - the arguments to use
+	 * @return the command result (could be a simple String or an array or Strings depends on the command)
+	 */
+	public static Object callNext(String... args) {
+		return callNextArray(args);
 	}
 	
 	/**

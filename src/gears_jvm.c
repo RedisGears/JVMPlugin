@@ -26,6 +26,7 @@ static void JVM_GBDestroy(JNIEnv *env, jobject objectOrClass);
 static jobject JVM_GBMap(JNIEnv *env, jobject objectOrClass, jobject mapper);
 static void JVM_GBRun(JNIEnv *env, jobject objectOrClass, jobject reader);
 static jobject JVM_GBExecute(JNIEnv *env, jobject objectOrClass, jobjectArray command);
+static jobject JVM_GBCallNext(JNIEnv *env, jobject objectOrClass, jobjectArray command);
 static void JVM_GBLog(JNIEnv *env, jobject objectOrClass, jstring msg, jobject logLevel);
 static jstring JVM_GBHashtag(JNIEnv *env, jobject objectOrClass);
 static jstring JVM_GBConfigGet(JNIEnv *env, jobject objectOrClass, jstring key);
@@ -189,6 +190,7 @@ jmethodID gearsGetBooleanValueMethodId = NULL;
 
 jclass gearsLongCls = NULL;
 jmethodID gearsLongValueOfMethodId = NULL;
+jmethodID gearsLongValMethodId = NULL;
 
 jclass futureRecordCls = NULL;
 jfieldID futureRecordPtrFieldId = NULL;
@@ -285,7 +287,10 @@ jfieldID streamReaderRetryIntervalField = NULL;
 jfieldID streamReaderTrimStreamField = NULL;
 
 jclass gearsCommandReaderCls = NULL;
+jclass gearsCommandOverriderCls = NULL;
 jfieldID commandReaderTriggerField = NULL;
+jfieldID commandOverriderCommandField = NULL;
+jfieldID commandOverriderPrefixField = NULL;
 
 jclass gearsStreamReaderFailedPolicyCls = NULL;
 jclass gearsStreamReaderFailedPolicyContinueCls = NULL;
@@ -396,6 +401,11 @@ JNINativeMethod gearsBuilderNativeMethod[] = {
             .name = "executeArray",
             .signature = "([Ljava/lang/String;)Ljava/lang/Object;",
             .fnPtr = JVM_GBExecute,
+        },
+        {
+            .name = "callNextArray",
+            .signature = "([Ljava/lang/String;)Ljava/lang/Object;",
+            .fnPtr = JVM_GBCallNext,
         },
         {
             .name = "log",
@@ -843,6 +853,7 @@ static JVM_ThreadLocalData* JVM_GetThreadLocalData(JVM_ExecutionCtx* jectx){
 
             JVM_TryFindClass(jvm_tld->env, "java/lang/Long", gearsLongCls);
             JVM_TryFindStaticMethod(jvm_tld->env, gearsLongCls, "valueOf", "(J)Ljava/lang/Long;", gearsLongValueOfMethodId);
+            JVM_TryFindMethod(jvm_tld->env, gearsLongCls, "longValue", "()J", gearsLongValMethodId);
 
             JVM_TryFindClass(jvm_tld->env, "gears/GearsBuilder", gearsBuilderCls);
 
@@ -960,6 +971,10 @@ static JVM_ThreadLocalData* JVM_GetThreadLocalData(JVM_ExecutionCtx* jectx){
 
             JVM_TryFindClass(jvm_tld->env, "gears/readers/CommandReader", gearsCommandReaderCls);
             JVM_TryFindField(jvm_tld->env, gearsCommandReaderCls, "trigger", "Ljava/lang/String;", commandReaderTriggerField);
+
+            JVM_TryFindClass(jvm_tld->env, "gears/readers/CommandOverrider", gearsCommandOverriderCls);
+            JVM_TryFindField(jvm_tld->env, gearsCommandOverriderCls, "command", "Ljava/lang/String;", commandOverriderCommandField);
+            JVM_TryFindField(jvm_tld->env, gearsCommandOverriderCls, "prefix", "Ljava/lang/String;", commandOverriderPrefixField);
 
             JVM_TryFindClass(jvm_tld->env, "gears/readers/StreamReader$FailurePolicy", gearsStreamReaderFailedPolicyCls);
             jfieldID temp = (*jvm_tld->env)->GetStaticFieldID(jvm_tld->env, gearsStreamReaderFailedPolicyCls, "CONTINUE", "Lgears/readers/StreamReader$FailurePolicy;");
@@ -1731,12 +1746,40 @@ static int JVM_RegisterStrKeyTypeToInt(const char* keyType){
     return -1;
 }
 
-void* JVM_CreateRegisterCommandReaderArgs(JNIEnv *env, FlatExecutionPlan* fep, jobject reader){
-    jclass readerCls = (*env)->GetObjectClass(env, reader);
-    if(!(*env)->IsSameObject(env, readerCls, gearsCommandReaderCls)){
-        (*env)->ThrowNew(env, exceptionCls, "Reader was changed!!!! Stop hacking!!!!");
+void* JVM_CreateRegisterCommandReaderOverrideArgs(JNIEnv *env, FlatExecutionPlan* fep, jobject reader){
+
+    jobject command = (*env)->GetObjectField(env, reader, commandOverriderCommandField);
+
+    if(!command){
+        (*env)->ThrowNew(env, exceptionCls, "command overrider command fields must be set");
         return NULL;
     }
+
+    jobject prefix = (*env)->GetObjectField(env, reader, commandOverriderPrefixField);
+
+    if(!prefix){
+        (*env)->ThrowNew(env, exceptionCls, "command overrider prefix fields must be set");
+        return NULL;
+    }
+
+    const char* commandStr = (*env)->GetStringUTFChars(env, command, NULL);
+    const char* prefixStr = NULL;
+    if(prefix){
+        const char* prefixStr = (*env)->GetStringUTFChars(env, prefix, NULL);
+    }
+
+    CommandReaderTriggerArgs* triggerArgs = RedisGears_CommandReaderTriggerArgsCreateHook(commandStr, prefixStr);
+
+    (*env)->ReleaseStringUTFChars(env, command, commandStr);
+
+    if(prefixStr){
+        (*env)->ReleaseStringUTFChars(env, prefix, prefixStr);
+    }
+
+    return triggerArgs;
+}
+
+void* JVM_CreateRegisterCommandReaderTriggerArgs(JNIEnv *env, FlatExecutionPlan* fep, jobject reader){
 
     jobject trigger = (*env)->GetObjectField(env, reader, commandReaderTriggerField);
 
@@ -1752,6 +1795,20 @@ void* JVM_CreateRegisterCommandReaderArgs(JNIEnv *env, FlatExecutionPlan* fep, j
     (*env)->ReleaseStringUTFChars(env, trigger, triggerStr);
 
     return triggerArgs;
+}
+
+void* JVM_CreateRegisterCommandReaderArgs(JNIEnv *env, FlatExecutionPlan* fep, jobject reader){
+    jclass readerCls = (*env)->GetObjectClass(env, reader);
+    if((*env)->IsSameObject(env, readerCls, gearsCommandReaderCls)){
+        return JVM_CreateRegisterCommandReaderTriggerArgs(env, fep, reader);
+    }
+
+    if((*env)->IsSameObject(env, readerCls, gearsCommandOverriderCls)){
+        return JVM_CreateRegisterCommandReaderOverrideArgs(env, fep, reader);
+    }
+
+    (*env)->ThrowNew(env, exceptionCls, "Reader was changed!!!! Stop hacking!!!!");
+    return NULL;
 }
 
 void* JVM_CreateRegisterStreamReaderArgs(JNIEnv *env, FlatExecutionPlan* fep, jobject reader){
@@ -2006,6 +2063,73 @@ static void JVM_GBLog(JNIEnv *env, jobject objectOrClass, jstring msg, jobject l
     RedisModule_Log(NULL, logLevelStr, "JAVA_GEARS: %s", msgStr);
 
     (*env)->ReleaseStringUTFChars(env, msg, msgStr);
+}
+
+static jobject JVM_GBCallNext(JNIEnv *env, jobject objectOrClass, jobjectArray args){
+    if(!args){
+        (*env)->ThrowNew(env, exceptionCls, "Got a NULL command");
+        return NULL;
+    }
+    size_t len = (*env)->GetArrayLength(env, args);
+
+    JVM_ThreadLocalData* jvm_tld = JVM_GetThreadLocalData(NULL);
+    if(!jvm_tld->eCtx){
+        (*env)->ThrowNew(env, exceptionCls, "Can no call next without execution ctx");
+        return NULL;
+    }
+    CommandReaderTriggerCtx* crtCtx = RedisGears_GetCommandReaderTriggerCtx(jvm_tld->eCtx);
+    if(!crtCtx){
+        (*env)->ThrowNew(env, exceptionCls, "Can no call next out of the command reader ctx");
+        return NULL;
+    }
+
+    RedisModuleString** argsRedisStr = array_new(RedisModuleString*, len);
+    for(size_t i = 0 ; i < len ; ++i){
+        jstring arg = (*env)->GetObjectArrayElement(env, args, i);
+        if(!arg){
+            array_free_ex(argsRedisStr, RedisModule_FreeString(NULL, *(RedisModuleString**)ptr));
+            (*env)->ThrowNew(env, exceptionCls, "Got a null argument on command");
+            return NULL;
+        }
+        const char* argStr = (*env)->GetStringUTFChars(env, arg, NULL);
+        RedisModuleString* argRedisStr = RedisModule_CreateString(NULL, argStr, strlen(argStr));
+        (*env)->ReleaseStringUTFChars(env, arg, argStr);
+        argsRedisStr = array_append(argsRedisStr, argRedisStr);
+    }
+
+    RedisModuleCtx *ctx = RedisModule_GetThreadSafeContext(NULL);
+    RedisGears_LockHanlderAcquire(ctx);
+
+    RedisModuleCallReply* reply = RedisGears_CommandReaderTriggerCtxNext(crtCtx, argsRedisStr, array_len(argsRedisStr));
+
+    RedisGears_LockHanlderRelease(ctx);
+
+    array_free_ex(argsRedisStr, RedisModule_FreeString(NULL, *(RedisModuleString**)ptr));
+
+    if(!reply || RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ERROR){
+        char* err;
+        if(reply){
+            size_t len;
+            const char* replyStr = RedisModule_CallReplyStringPtr(reply, &len);
+            err = JVM_ALLOC(len + 1);
+            memcpy(err, replyStr, len);
+            err[len] = '\0';
+            RedisModule_FreeCallReply(reply);
+        }else{
+            err = JVM_STRDUP("Got a NULL reply from redis");
+        }
+        (*env)->ThrowNew(env, exceptionCls, err);
+        JVM_FREE(err);
+        return NULL;
+    }
+
+    jobject res = JVM_GBExecuteParseReply(env, reply);
+
+    RedisModule_FreeCallReply(reply);
+
+    RedisModule_FreeThreadSafeContext(ctx);
+
+    return res;
 }
 
 static jobject JVM_GBExecute(JNIEnv *env, jobject objectOrClass, jobjectArray command){
@@ -2776,8 +2900,20 @@ static int JVMRecord_SendReply(Record* base, RedisModuleCtx* rctx){
     JVMRecord* r = (JVMRecord*)base;
     JVM_ThreadLocalData* jvm_tld = JVM_GetThreadLocalData(NULL);
     JNIEnv *env = jvm_tld->env;
-    jobject res = (*env)->CallStaticObjectMethod(env, gearsBuilderCls, recordToStr, r->obj);
+
     char* err = NULL;
+    if((*env)->IsInstanceOf(env, r->obj, gearsLongCls)){
+        jlong res = (*env)->CallLongMethod(env, r->obj, gearsLongValMethodId);
+        if((err = JVM_GetException(env))){
+            RedisModule_Log(NULL, "warning", "Excpetion raised but not catched, exception='%s'", err);
+            RedisModule_ReplyWithCString(rctx, err);
+            return REDISMODULE_OK;
+        }
+        RedisModule_ReplyWithLongLong(rctx, res);
+        return REDISMODULE_OK;
+    }
+
+    jobject res = (*env)->CallStaticObjectMethod(env, gearsBuilderCls, recordToStr, r->obj);
     if((err = JVM_GetException(env))){
         RedisModule_Log(NULL, "warning", "Excpetion raised but not catched, exception='%s'", err);
         RedisModule_ReplyWithCString(rctx, err);

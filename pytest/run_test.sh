@@ -27,3 +27,5 @@ LD_LIBRARY_PATH=$JVM_PATH python2.7 -m RLTest --module ../bin/RedisGears/redisge
 
 echo cluster 3 shards
 LD_LIBRARY_PATH=$JVM_PATH python2.7 -m RLTest --module ../bin/RedisGears/redisgears.so --module-args "PluginsDirectory ../../src/ JvmOptions $JVM_OPTIONS CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/" --clear-logs --env oss-cluster --shards-count 3 "$@"
+
+rm -rf ../bin/RedisGears/.venv-*

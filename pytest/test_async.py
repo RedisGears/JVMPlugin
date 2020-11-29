@@ -48,4 +48,5 @@ def testAsyncRecrodFilterRaiseExcpetion(env, errs, **kargs):
 @jvmTestDecorator(preExecute=putKeys({'x':'1', 'y':'2'}))
 def testAsyncRecrodForeachRaiseExcpetion(env, errs, **kargs):
     env.assertGreaterEqual(len(errs), 1)
-    env.assertIn('java.lang.RuntimeException: error', errs[0])    
+    env.assertIn('java.lang.RuntimeException: error', errs[0])
+    
