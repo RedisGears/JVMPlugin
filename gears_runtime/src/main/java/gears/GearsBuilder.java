@@ -13,10 +13,14 @@ import com.sun.management.HotSpotDiagnosticMXBean;
 
 import gears.operations.AccumulateByOperation;
 import gears.operations.AccumulateOperation;
+import gears.operations.AsyncFilterOperation;
+import gears.operations.AsyncForeachOperation;
+import gears.operations.AsyncMapOperation;
 import gears.operations.ExtractorOperation;
 import gears.operations.FilterOperation;
 import gears.operations.FlatMapOperation;
 import gears.operations.ForeachOperation;
+import gears.operations.GearsFutureOnDone;
 import gears.operations.MapOperation;
 import gears.operations.OnRegisteredOperation;
 import gears.operations.OnUnregisteredOperation;
@@ -83,6 +87,19 @@ public class GearsBuilder<T extends Serializable>{
 	 */
 	public native <I extends Serializable> GearsBuilder<I> map(MapOperation<T, I> mapper);
 	
+	@SuppressWarnings("unchecked")
+	public <I extends Serializable> GearsBuilder<I> asyncMap(AsyncMapOperation<T, I> mapper){
+		this.map(r->{
+			GearsFuture<I> f = mapper.map(r);
+			if(f == null) {
+				throw new Exception("null future returned");
+			}
+			return new FutureRecord<I>(f);
+		});
+		
+		return (GearsBuilder<I>) this;
+	}
+	
 	/**
 	 * Add a flatmap operation to the pipe. the operation must return an Iterable
 	 * object. RedisGears iterate over the element in the Iterable object and pass
@@ -117,6 +134,18 @@ public class GearsBuilder<T extends Serializable>{
 	 */
 	public native GearsBuilder<T> foreach(ForeachOperation<T> foreach);
 	
+	public GearsBuilder<T> asyncForeach(AsyncForeachOperation<T> foreach){
+		this.foreach(r->{				
+			GearsFuture<T> f = foreach.foreach(r);
+			if(f == null) {
+				throw new Exception("null future returned");
+			}
+			new FutureRecord<T>(f);
+		});
+		
+		return this;
+	}
+	
 	/**
 	 * Add a filter operation to the pipe.
 	 * The filter should return true if RedisGears should continue process the record
@@ -133,7 +162,23 @@ public class GearsBuilder<T extends Serializable>{
 	 * @param foreach - the foreach operation
 	 * @return - GearsBuilder with the same template type as the input builder, notice that the return object might be the same as the previous.
 	 */
-	public native GearsBuilder<T> filter(FilterOperation<T> foreach);
+	public native GearsBuilder<T> filter(FilterOperation<T> filter);
+	
+	public GearsBuilder<T> asyncFilter(AsyncFilterOperation<T> filter){
+		this.filter(r->{
+			GearsFuture<Boolean> f = filter.filter(r);
+			
+			if(f == null) {
+				throw new Exception("null future returned");
+			}
+			
+			new FutureRecord<Boolean>(f);
+			
+			return true;
+		});
+		
+		return this;
+	}
 	
 	/**
 	 * Add an accumulateBy operation to the pipe.
@@ -274,17 +319,12 @@ public class GearsBuilder<T extends Serializable>{
 	 * @return GearsBuilder with a new template type, notice that the return object might be the same as the previous.
 	 */
 	public <I extends Serializable> GearsBuilder<I> accumulate(I initialValue, AccumulateOperation<T, I> accumulator){
-		return this.accumulate(new AccumulateOperation<T, I>() {
-			private static final long serialVersionUID = 1L;
-
-			@Override
-			public I accumulate(I a, T r) throws Exception {
-				if(a == null) {
-					a = initialValue;
-				}
-				return accumulator.accumulate(a, r);
+		return this.accumulate((a,r)->{
+			if(a == null) {
+				a = initialValue;
 			}
 			
+			return accumulator.accumulate(a, r);
 		});
 	}
 	

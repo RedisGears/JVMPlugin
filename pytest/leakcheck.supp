@@ -120,6 +120,69 @@
    ...
 }
 {
+   <ignore_jvm_error1.6>
+   Memcheck:Cond
+   ...
+   fun:JNI_CreateJavaVM
+   ...
+}
+{
+   <ignore_jvm_error1.6>
+   Memcheck:Leak
+   ...
+   fun:JNI_CreateJavaVM
+   ...
+}
+{
+   <ignore_jvm_error1.7>
+   Memcheck:Leak
+   ...
+   fun:*thread_native_entry*
+   ...
+}
+{  
+   <ignore_jvm_error1.8>
+   Memcheck:Cond
+   ...
+   fun:*thread_native_entry*
+   ...
+}
+{
+   <ignore_jvm_error1.8>
+   Memcheck:Cond
+   ...
+   fun:*checked_jni_NewGlobalRef*
+   ...
+}
+{
+   <ignore_jvm_error1.8>
+   Memcheck:Cond
+   ...
+   fun:*checked_jni_DeleteLocalRef*
+   ...
+}
+{
+   <ignore_jvm_error1.8>
+   Memcheck:Cond
+   ...
+   fun:*attach_current_thread*
+   ...
+}
+{
+   <ignore_jvm_error1.9>
+   Memcheck:Cond
+   ...
+   fun:*Monitor*
+   ...
+}
+{
+   <ignore_jvm_error1.10>
+   Memcheck:Cond
+   ...
+   fun:*validate_object*
+   ...
+}
+{
    <ignore_jvm_error2>
    Memcheck:Addr4
    ...
@@ -142,4 +205,11 @@
    Memcheck:Leak
    ...
    fun:???
+}
+{
+   Libuv_epoll_ctl
+   Memcheck:Param
+   epoll_ctl(event)
+   fun:epoll_ctl
+   ...
 }
