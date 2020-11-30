@@ -2910,15 +2910,62 @@ static int JVMRecord_SendReply(Record* base, RedisModuleCtx* rctx){
     JVM_ThreadLocalData* jvm_tld = JVM_GetThreadLocalData(NULL);
     JNIEnv *env = jvm_tld->env;
 
+    JVM_PushFrame(env);
+
     char* err = NULL;
     if((*env)->IsInstanceOf(env, r->obj, gearsLongCls)){
         jlong res = (*env)->CallLongMethod(env, r->obj, gearsLongValMethodId);
         if((err = JVM_GetException(env))){
-            RedisModule_Log(NULL, "warning", "Excpetion raised but not catched, exception='%s'", err);
-            RedisModule_ReplyWithCString(rctx, err);
-            return REDISMODULE_OK;
+            goto error;
         }
         RedisModule_ReplyWithLongLong(rctx, res);
+        JVM_PopFrame(env);
+        return REDISMODULE_OK;
+    }
+
+    jobject iterator = NULL;
+    if((*env)->IsInstanceOf(env, r->obj, iterableCls)){
+        jobject iterator = (*env)->CallObjectMethod(env, r->obj, iteratorMethodId);
+        if((err = JVM_GetException(env))){
+            goto error;
+        }
+
+        size_t len = 0;
+        RedisModule_ReplyWithArray(rctx, REDISMODULE_POSTPONED_ARRAY_LEN);
+        JVMRecord* innerRecord = (JVMRecord*)RedisGears_RecordCreate(JVMRecordType);
+
+        while((*env)->CallBooleanMethod(env, iterator, iteratorHasNextMethodId)){
+            ++len;
+            if((err = JVM_GetException(env))){
+                RedisModule_ReplyWithError(rctx, err);
+                JVM_FREE(err);
+                break;
+            }
+
+            jobject obj = (*env)->CallObjectMethod(env, iterator, iteratorNextMethodId);
+
+            if((err = JVM_GetException(env))){
+                RedisModule_ReplyWithError(rctx, err);
+                JVM_FREE(err);
+                break;
+            }
+
+            innerRecord->obj = obj;
+            JVMRecord_SendReply(&innerRecord->baseRecord, rctx);
+            innerRecord->obj = NULL;
+        }
+
+        if((err = JVM_GetException(env))){
+            RedisModule_ReplyWithError(rctx, err);
+            JVM_FREE(err);
+            ++len;
+        }
+
+        RedisModule_ReplySetArrayLength(rctx, len);
+
+        RedisGears_FreeRecord(&innerRecord->baseRecord);
+
+        JVM_PopFrame(env);
         return REDISMODULE_OK;
     }
 
@@ -2932,6 +2979,14 @@ static int JVMRecord_SendReply(Record* base, RedisModuleCtx* rctx){
         (*jvm_tld->env)->ReleaseStringUTFChars(jvm_tld->env, res, resStr);
         (*jvm_tld->env)->DeleteLocalRef(jvm_tld->env, res);
     }
+    JVM_PopFrame(env);
+    return REDISMODULE_OK;
+
+error:
+    RedisModule_Log(NULL, "warning", "Excpetion raised but not catched, exception='%s'", err);
+    RedisModule_ReplyWithCString(rctx, err);
+    JVM_FREE(err);
+    JVM_PopFrame(env);
     return REDISMODULE_OK;
 }
 
