@@ -519,7 +519,16 @@ static void* JVM_SessionDup(void* arg){
 }
 
 static void* JVM_FepSessionDup(void* arg){
-    return arg;
+    JVMFlatExecutionSession* fepSession = arg;
+    JVM_ThreadLocalData* jvm_ltd = JVM_GetThreadLocalData(NULL);
+    JNIEnv *env = jvm_ltd->env;
+    char* err;
+    JVMFlatExecutionSession* newFepSession = JVM_FepSessionCreate(env, JVM_SessionDup(fepSession->session), &err);
+    if(err){
+        RedisModule_Log(NULL, "warning", "%s", err);
+        RedisModule_Assert(false);
+    }
+    return newFepSession;
 }
 
 static int JVM_SessionSerialize(FlatExecutionPlan* fep, void* arg, Gears_BufferWriter* bw, char** err){
