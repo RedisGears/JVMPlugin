@@ -38,7 +38,7 @@ jobs:
         - persist_to_workspace:
             root: artifacts
             paths:
-              - '*.tgz'
+              - 'snapshot/*.tgz'
   build-and-test-centos:
       docker:
         - image: 'centos:centos7'
@@ -80,7 +80,7 @@ jobs:
         - persist_to_workspace:
             root: artifacts
             paths:
-              - '*.tgz'
+              - 'snapshot/*.tgz'
   deploy_snapshots:
       docker:
         - image: redisfab/rmbuilder:6.0.9-x64-buster
@@ -90,7 +90,7 @@ jobs:
         - run:
             name: Deploy Snapshots to S3
             command: |
-              for f in artifacts/*.tgz; do
+              for f in artifacts/snapshot/*.tgz; do
                 aws s3 cp $f s3://redismodules/redisgears_plugins/jvm_plugin/snapshots/ --acl public-read
               done
 on-any-branch: &on-any-branch
