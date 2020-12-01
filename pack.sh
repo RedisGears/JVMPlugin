@@ -1,2 +1,2 @@
 mkdir -p ./artifacts/snapshot
-tar -czvf ./artifacts/snapshot/gears-jvm.linux-$OS-x64.$GIT_BRANCH.tgz --transform "s,^./src/,./plugins/," ./bin/OpenJDK/OpenJDK11U-jdk_x64_linux_hotspot_11.0.9.1_1.tar.gz ./src/gears_jvm.so
+tar -czvf ./artifacts/snapshot/gears-jvm.linux-$OS-x64.$GIT_BRANCH.tgz --transform "s,^./src/,./plugins/," ./bin/OpenJDK/jdk-11.0.9.1+1/* ./src/gears_jvm.so
