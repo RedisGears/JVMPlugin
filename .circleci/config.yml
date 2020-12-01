@@ -32,6 +32,13 @@ jobs:
         - run:
             name: Tests
             command: make tests
+        - run:
+            name: Pack
+            command: make pack
+        - persist_to_workspace:
+            root: artifacts
+            paths:
+              - '*.tgz'
   build-and-test-centos:
       docker:
         - image: 'centos:centos7'
@@ -67,13 +74,36 @@ jobs:
         - run:
             name: Tests
             command: . /opt/rh/devtoolset-8/enable; make tests
-
+        - run:
+            name: Pack
+            command: make pack
+        - persist_to_workspace:
+            root: artifacts
+            paths:
+              - '*.tgz'
+  deploy_snapshots:
+      docker:
+        - image: redisfab/rmbuilder:6.0.9-x64-buster
+      steps:
+        - attach_workspace:
+            at: artifacts
+        - run:
+            name: Deploy Snapshots to S3
+            command: |
+              for f in artifacts/*.tgz; do
+                aws s3 cp $f s3://redismodules/redisgears_plugins/jvm_plugin/snapshots/ --acl public-read
+              done
 on-any-branch: &on-any-branch
   filters:
     branches:
       only: /.*/
     tags:
       only: /.*/
+
+on-master: &on-master
+  filters:
+    branches:
+      only: master
 
 workflows:
   version: 2
@@ -83,6 +113,8 @@ workflows:
           <<: *on-any-branch
       - build-and-test-centos:
           <<: *on-any-branch
+      - deploy_snapshots:
+          <<: *on-master
 
   nightly:
       triggers:

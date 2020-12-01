@@ -1,4 +1,5 @@
 OS=$(shell ./deps/readies/bin/platform --osnick)
+GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 $(info OS=$(OS))
 
 all: gears_jvm
@@ -24,3 +25,5 @@ tests: gears_jvm
 run: gears_jvm
 	redis-server --loadmodule ./bin/RedisGears/redisgears.so PluginsDirectory ./src/ JvmOptions "-Djava.class.path=./gears_runtime/target/gear_runtime-0.0.3-SNAPSHOT-jar-with-dependencies.jar" CreateVenv 1 pythonInstallationDir ./bin/RedisGears/
 	
+pack: gears_jvm
+	OS=$(OS) GIT_BRANCH=$(GIT_BRANCH) ./pack.sh

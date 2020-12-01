@@ -53,3 +53,4 @@ dkms.conf
 *.jar
 bin/*
 pytest/gears_tests/build/*
+artifacts/*

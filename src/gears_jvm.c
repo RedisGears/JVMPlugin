@@ -809,6 +809,11 @@ static JavaVMOption* JVM_GetJVMOptions(char** jvmOptionsString){
     options = array_append(options, jniCheckOption);
 #endif
 
+    for(size_t i = 0 ; i < array_len(options) ; ++i){
+        JavaVMOption* opt =  options + i;
+        RedisModule_Log(NULL, "notice", "JVM Options: %s", opt->optionString);
+    }
+
     return options;
 }
 
