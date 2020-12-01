@@ -23,7 +23,7 @@ tests: gears_jvm
 	cd ./pytest; ./run_test.sh
 	
 run: gears_jvm
-	redis-server --loadmodule ./bin/RedisGears/redisgears.so PluginsDirectory ./src/ JvmOptions "-Djava.class.path=./gears_runtime/target/gear_runtime-0.0.3-SNAPSHOT-jar-with-dependencies.jar" CreateVenv 1 pythonInstallationDir ./bin/RedisGears/
+	redis-server --loadmodule ./bin/RedisGears/redisgears.so PluginsDirectory ./src/ JvmOptions "-Djava.class.path=./gears_runtime/target/gear_runtime-jar-with-dependencies.jar" JvmPath ./bin/OpenJDK/jdk-11.0.9.1+1/ CreateVenv 1 pythonInstallationDir ./bin/RedisGears/
 	
 pack: gears_jvm
 	OS=$(OS) GIT_BRANCH=$(GIT_BRANCH) ./pack.sh

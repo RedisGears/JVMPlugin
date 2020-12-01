@@ -71,6 +71,7 @@
 		<maven.compiler.target>8</maven.compiler.target>
 		<maven.test.source>8</maven.test.source>
 		<maven.test.target>8</maven.test.target>
+    	<jar.finalName>gear_runtime</jar.finalName>
 	</properties>
 
 	<distributionManagement>
@@ -129,6 +130,7 @@
 				<artifactId>maven-assembly-plugin</artifactId>
 				<version>2.5.4</version>
 				<configuration>
+					<finalName>gear_runtime</finalName>
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>

@@ -1,5 +1,9 @@
+#define __USE_GNU
+#include <dlfcn.h>
+
 #include "jni.h"       /* where everything is defined */
 #include <stdbool.h>
+#include <stdlib.h>
 #include "redismodule.h"
 #include "redisgears.h"
 #include "version.h"
@@ -774,6 +778,9 @@ static jfieldID JVM_FindField(JNIEnv *env, jclass clazz, const char* name, const
         }
 
 #define JVM_OPTIONS_CONFIG "JvmOptions"
+#define JVM_PATH_CONFIG "JvmPath"
+
+void test(){}
 
 static JavaVMOption* JVM_GetJVMOptions(char** jvmOptionsString){
     JavaVMOption* options = array_new(JavaVMOption, 10);
@@ -809,6 +816,13 @@ static JavaVMOption* JVM_GetJVMOptions(char** jvmOptionsString){
     options = array_append(options, jniCheckOption);
 #endif
 
+    const char* moduleDataDir = getenv("modulesdatadir");
+    if(moduleDataDir){
+        JavaVMOption jniCheckOption;
+        JVM_asprintf(&jniCheckOption.optionString, "-Djava.class.path=%s/rg/%d/deps/gears_runtime/target/gear_runtime-jar-with-dependencies.jar", moduleDataDir, RedisGears_GetVersion());
+        options = array_append(options, jniCheckOption);
+    }
+
     for(size_t i = 0 ; i < array_len(options) ; ++i){
         JavaVMOption* opt =  options + i;
         RedisModule_Log(NULL, "notice", "JVM Options: %s", opt->optionString);
@@ -828,6 +842,8 @@ static void JVM_ThreadLocalDataRestor(JVM_ThreadLocalData* jvm_ltd, JVM_Executio
     jvm_ltd->asyncRecorType = jectx->asyncRecorType;
 }
 
+typedef jint (JNICALL * CreateVM)(JavaVM **pvm, void **penv, void *args);
+
 static JVM_ThreadLocalData* JVM_GetThreadLocalData(JVM_ExecutionCtx* jectx){
     JVM_ThreadLocalData* jvm_tld = pthread_getspecific(threadLocalData);
     if(!jvm_tld){
@@ -842,7 +858,34 @@ static JVM_ThreadLocalData* JVM_GetThreadLocalData(JVM_ExecutionCtx* jectx){
             vm_args.ignoreUnrecognized = false;
             /* load and initialize a Java VM, return a JNI interface
              * pointer in env */
-            jint jvmInitRes = JNI_CreateJavaVM(&jvm, (void**)&jvm_tld->env, &vm_args);
+            char *pathtojvm;
+
+            const char* moduleDataDir = getenv("modulesdatadir");
+            if(moduleDataDir){
+                JVM_asprintf(&pathtojvm, "%s/rg/%d/deps/bin/OpenJDK/jdk-11.0.9.1+1/lib/server/libjvm.so", moduleDataDir, RedisGears_GetVersion());
+            }else{
+                JVM_asprintf(&pathtojvm, "%s/lib/server/libjvm.so", RedisGears_GetConfig(JVM_PATH_CONFIG));
+            }
+
+            RedisModule_Log(NULL, "notice", "Loading jvm from %s", pathtojvm);
+
+            void *handle = dlopen(pathtojvm, RTLD_NOW|RTLD_LOCAL);
+
+            if (NULL == handle) {
+                RedisModule_Log(NULL, "warning", "Failed open jvm");
+                return NULL;
+            }
+
+            JVM_FREE(pathtojvm);
+
+            CreateVM createVM = (CreateVM)dlsym(handle, "JNI_CreateJavaVM");
+
+            if (NULL == createVM) {
+                RedisModule_Log(NULL, "warning", "Failed getting JNI_CreateJavaVM symbol");
+                return NULL;
+            }
+
+            jint jvmInitRes = createVM(&jvm, (void**)&jvm_tld->env, &vm_args);
 
             if(jvmInitRes != 0){
                 RedisModule_Log(NULL, "warning", "Failed initializing the jvm");
