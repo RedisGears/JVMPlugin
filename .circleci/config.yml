@@ -105,6 +105,11 @@ on-master: &on-master
     branches:
       only: master
 
+after-build-and-test: &after-build-and-test
+  requires:
+    - build-and-test-bionic
+    - build-and-test-centos
+
 workflows:
   version: 2
   commit:
@@ -114,6 +119,7 @@ workflows:
       - build-and-test-centos:
           <<: *on-any-branch
       - deploy_snapshots:
+          <<: *after-build-and-test
           <<: *on-master
 
   nightly:
