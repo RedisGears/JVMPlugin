@@ -1,5 +1,6 @@
 #!/bin/bash
 set -x
+set -e
 
 mkdir -p ./gears_tests/build/;cd ./gears_tests/build/;../../../bin/OpenJDK/jdk-11.0.9.1+1/bin/javac -d ./ -classpath ./../../../gears_runtime/target/gear_runtime-0.0.3-SNAPSHOT-jar-with-dependencies.jar ../src/gears_tests/*;../../../bin/OpenJDK/jdk-11.0.9.1+1/bin/jar -cvf gears_tests.jar ./gears_tests/
 cd ../../

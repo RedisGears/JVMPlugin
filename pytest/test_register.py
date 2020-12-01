@@ -248,6 +248,9 @@ def testCommandOverride(env, results, errs, conn, **kargs):
     env.assertEqual(conn.execute_command('hset', 'h1', 'foo', 'bar'), 2)
     env.assertNotEqual(conn.execute_command('hget', 'h1', 'time'), None)
 
+    env.assertEqual(conn.execute_command('hset', 'b1', 'foo', 'bar'), 1)
+    env.assertEqual(conn.execute_command('hget', 'b1', 'time'), None)
+
 @jvmTestDecorator()
 def testAsyncStepInSyncExecution(env, results, errs, conn, **kargs):
     env.assertEqual(len(errs), 0)

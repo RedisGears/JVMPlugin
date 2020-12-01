@@ -1766,15 +1766,10 @@ void* JVM_CreateRegisterCommandReaderOverrideArgs(JNIEnv *env, FlatExecutionPlan
 
     jobject prefix = (*env)->GetObjectField(env, reader, commandOverriderPrefixField);
 
-    if(!prefix){
-        (*env)->ThrowNew(env, exceptionCls, "command overrider prefix fields must be set");
-        return NULL;
-    }
-
     const char* commandStr = (*env)->GetStringUTFChars(env, command, NULL);
     const char* prefixStr = NULL;
     if(prefix){
-        const char* prefixStr = (*env)->GetStringUTFChars(env, prefix, NULL);
+        prefixStr = (*env)->GetStringUTFChars(env, prefix, NULL);
     }
 
     CommandReaderTriggerArgs* triggerArgs = RedisGears_CommandReaderTriggerArgsCreateHook(commandStr, prefixStr);
@@ -2257,7 +2252,6 @@ static void JVM_GBRegister(JNIEnv *env, jobject objectOrClass, jobject reader, j
 
     void* triggerCtx = JVM_CreateRegisterReaderArgs(env, fep, reader);
     if(!triggerCtx){
-        (*env)->ThrowNew(env, exceptionCls, "Failed creating registration args");
         return;
     }
     if(!RGM_Register(fep, mode, triggerCtx, &err)){
