@@ -819,7 +819,7 @@ static JavaVMOption* JVM_GetJVMOptions(char** jvmOptionsString){
     const char* moduleDataDir = getenv("modulesdatadir");
     if(moduleDataDir){
         JavaVMOption jniCheckOption;
-        JVM_asprintf(&jniCheckOption.optionString, "-Djava.class.path=%s/rg/%d/deps/gears_runtime/target/gear_runtime-jar-with-dependencies.jar", moduleDataDir, RedisGears_GetVersion());
+        JVM_asprintf(&jniCheckOption.optionString, "-Djava.class.path=%s/rg/%d/deps/gears_jvm/gears_runtime/target/gear_runtime-jar-with-dependencies.jar", moduleDataDir, RedisGears_GetVersion());
         options = array_append(options, jniCheckOption);
     }
 
@@ -862,7 +862,7 @@ static JVM_ThreadLocalData* JVM_GetThreadLocalData(JVM_ExecutionCtx* jectx){
 
             const char* moduleDataDir = getenv("modulesdatadir");
             if(moduleDataDir){
-                JVM_asprintf(&pathtojvm, "%s/rg/%d/deps/bin/OpenJDK/jdk-11.0.9.1+1/lib/server/libjvm.so", moduleDataDir, RedisGears_GetVersion());
+                JVM_asprintf(&pathtojvm, "%s/rg/%d/deps/gears_jvm/bin/OpenJDK/jdk-11.0.9.1+1/lib/server/libjvm.so", moduleDataDir, RedisGears_GetVersion());
             }else{
                 JVM_asprintf(&pathtojvm, "%s/lib/server/libjvm.so", RedisGears_GetConfig(JVM_PATH_CONFIG));
             }
