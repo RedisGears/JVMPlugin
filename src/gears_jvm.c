@@ -784,27 +784,13 @@ void test(){}
 
 static JavaVMOption* JVM_GetJVMOptions(char** jvmOptionsString){
     JavaVMOption* options = array_new(JavaVMOption, 10);
-    *jvmOptionsString = JVM_STRDUP(RedisGears_GetConfig(JVM_OPTIONS_CONFIG));
-    if(!*jvmOptionsString){
-        return options;
+
+    const char* moduleDataDir = getenv("modulesdatadir");
+    if(moduleDataDir){
+        JavaVMOption jniCheckOption;
+        JVM_asprintf(&jniCheckOption.optionString, "-Djava.class.path=%s/rg/%d/deps/gears_jvm/gears_runtime/target/gear_runtime-jar-with-dependencies.jar", moduleDataDir, RedisGears_GetVersion());
+        options = array_append(options, jniCheckOption);
     }
-    char* optionStr = *jvmOptionsString;
-    while(optionStr && *optionStr != '\0'){
-        while(*optionStr == ' '){
-            ++optionStr;
-        }
-        if(*optionStr == '\0'){
-            break;
-        }
-        JavaVMOption option;
-        option.optionString = optionStr;
-        options = array_append(options, option);
-        optionStr = strstr(optionStr, " ");
-        if(optionStr){
-            *optionStr = '\0';
-            optionStr++;
-        }
-    };
 
     JavaVMOption option;
     option.optionString = "-Xrs";
@@ -816,11 +802,26 @@ static JavaVMOption* JVM_GetJVMOptions(char** jvmOptionsString){
     options = array_append(options, jniCheckOption);
 #endif
 
-    const char* moduleDataDir = getenv("modulesdatadir");
-    if(moduleDataDir){
-        JavaVMOption jniCheckOption;
-        JVM_asprintf(&jniCheckOption.optionString, "-Djava.class.path=%s/rg/%d/deps/gears_jvm/gears_runtime/target/gear_runtime-jar-with-dependencies.jar", moduleDataDir, RedisGears_GetVersion());
-        options = array_append(options, jniCheckOption);
+    *jvmOptionsString = (char*)RedisGears_GetConfig(JVM_OPTIONS_CONFIG);
+    if(*jvmOptionsString){
+        *jvmOptionsString = JVM_STRDUP(*jvmOptionsString);
+        char* optionStr = *jvmOptionsString;
+        while(optionStr && *optionStr != '\0'){
+            while(*optionStr == ' '){
+                ++optionStr;
+            }
+            if(*optionStr == '\0'){
+                break;
+            }
+            JavaVMOption option;
+            option.optionString = optionStr;
+            options = array_append(options, option);
+            optionStr = strstr(optionStr, " ");
+            if(optionStr){
+                *optionStr = '\0';
+                optionStr++;
+            }
+        };
     }
 
     for(size_t i = 0 ; i < array_len(options) ; ++i){
