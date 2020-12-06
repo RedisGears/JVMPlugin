@@ -1666,11 +1666,8 @@ static void JVM_ScanKeyCallback(RedisModuleKey *key, RedisModuleString *field, R
     Gears_BufferWriter* bw = privdata;
     size_t fieldCStrLen;
     const char* fieldCStr = RedisModule_StringPtrLen(field, &fieldCStrLen);
-    size_t valCStrLen = 7;
-    const char* valCStr = "unknown";
-    if(((robj*)value)->encoding == 8){
-        valCStr = RedisModule_StringPtrLen(value, &valCStrLen);
-    }
+    size_t valCStrLen;
+    const char* valCStr = RedisModule_StringPtrLen(value, &valCStrLen);
     RedisGears_BWWriteBuffer(bw, fieldCStr, fieldCStrLen);
     RedisGears_BWWriteBuffer(bw, valCStr, valCStrLen);
 }
