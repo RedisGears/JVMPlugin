@@ -18,15 +18,15 @@ JVM_OPTIONS+="../../gears_runtime/target/gear_runtime-jar-with-dependencies.jar"
 JVM_PATH=../../bin/OpenJDK/jdk-11.0.9.1+1/
 
 echo oss
-python2.7 -m RLTest --module ../bin/RedisGears/redisgears.so --module-args "PluginsDirectory ../../src/ JvmPath $JVM_PATH JvmOptions $JVM_OPTIONS CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/" --clear-logs "$@"
+python2.7 -m RLTest --module ../bin/RedisGears/redisgears.so --module-args "Plugin ../../src/gears_jvm.so JvmPath $JVM_PATH JvmOptions $JVM_OPTIONS CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/" --clear-logs "$@"
 
 echo cluster 1 shard
-python2.7 -m RLTest --module ../bin/RedisGears/redisgears.so --module-args "PluginsDirectory ../../src/ JvmPath $JVM_PATH JvmOptions $JVM_OPTIONS CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/" --clear-logs --env oss-cluster --shards-count 1 "$@"
+python2.7 -m RLTest --module ../bin/RedisGears/redisgears.so --module-args "Plugin ../../src/gears_jvm.so JvmPath $JVM_PATH JvmOptions $JVM_OPTIONS CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/" --clear-logs --env oss-cluster --shards-count 1 "$@"
 
 echo cluster 2 shards
-python2.7 -m RLTest --module ../bin/RedisGears/redisgears.so --module-args "PluginsDirectory ../../src/ JvmPath $JVM_PATH JvmOptions $JVM_OPTIONS CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/" --clear-logs --env oss-cluster --shards-count 2 "$@"
+python2.7 -m RLTest --module ../bin/RedisGears/redisgears.so --module-args "Plugin ../../src/gears_jvm.so JvmPath $JVM_PATH JvmOptions $JVM_OPTIONS CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/" --clear-logs --env oss-cluster --shards-count 2 "$@"
 
 echo cluster 3 shards
-python2.7 -m RLTest --module ../bin/RedisGears/redisgears.so --module-args "PluginsDirectory ../../src/ JvmPath $JVM_PATH JvmOptions $JVM_OPTIONS CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/" --clear-logs --env oss-cluster --shards-count 3 "$@"
+python2.7 -m RLTest --module ../bin/RedisGears/redisgears.so --module-args "Plugin ../../src/gears_jvm.so JvmPath $JVM_PATH JvmOptions $JVM_OPTIONS CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/" --clear-logs --env oss-cluster --shards-count 3 "$@"
 
 rm -rf ../bin/RedisGears/.venv-*

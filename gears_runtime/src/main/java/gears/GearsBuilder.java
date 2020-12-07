@@ -459,8 +459,10 @@ public class GearsBuilder<T extends Serializable>{
 	 * @param mode - the registration mode
 	 * @param onRegister - onRegister callback
 	 * @param onUnregistered - onUnregister callback
+	 * 
+	 * @return - registration id
 	 */
-	private native void innerRegister(BaseReader<T> reader, ExecutionMode mode, OnRegisteredOperation onRegister, OnUnregisteredOperation onUnregistered);
+	private native String innerRegister(BaseReader<T> reader, ExecutionMode mode, OnRegisteredOperation onRegister, OnUnregisteredOperation onUnregistered);
 	
 	/**
 	 * Runs the current built pipe
@@ -491,17 +493,21 @@ public class GearsBuilder<T extends Serializable>{
 	
 	/*
 	 * Register the pipe as an async registration (i.e execution will run asynchronously on the entire cluster)
+	 * 
+	 * @return - registration id
 	 */
-	public void register() {
-		register(ExecutionMode.ASYNC, null, null);
+	public String register() {
+		return register(ExecutionMode.ASYNC, null, null);
 	}
 	
 	/**
 	 * Register the pipe to be trigger on events
 	 * @param mode - the execution mode to use (ASYNC/ASYNC_LOCAL/SYNC)
+	 * 
+	 * @return - registration id
 	 */
-	public void register(ExecutionMode mode) {
-		register(mode, null, null);
+	public String register(ExecutionMode mode) {
+		return register(mode, null, null);
 	}
 	
 	/**
@@ -509,9 +515,11 @@ public class GearsBuilder<T extends Serializable>{
 	 * @param mode - the execution mode to use (ASYNC/ASYNC_LOCAL/SYNC)
 	 * @param onRegister - register callback that will be called on each shard upon register
 	 * @param onUnregistered - unregister callback that will be called on each shard upon unregister
+	 * 
+	 * @return - registration id
 	 */
-	public void register(ExecutionMode mode, OnRegisteredOperation onRegister, OnUnregisteredOperation onUnregistered) {
-		innerRegister(reader, mode, onRegister, onUnregistered);
+	public String register(ExecutionMode mode, OnRegisteredOperation onRegister, OnUnregisteredOperation onUnregistered) {
+		return innerRegister(reader, mode, onRegister, onUnregistered);
 	}
 	
 	/**
