@@ -10,7 +10,7 @@ public class testOnRegisteredCallback {
 	public static void main() throws IOException {
 		KeysReader reader = new KeysReader();
 		new GearsBuilder(reader).
-		register(ExecutionMode.ASYNC_LOCAL, ()->{
+		register(ExecutionMode.ASYNC_LOCAL, (id)->{
 			GearsBuilder.execute("set", String.format("registered{%s}", GearsBuilder.hashtag()), "1");
 		}, null);
 	}
