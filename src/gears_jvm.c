@@ -47,9 +47,10 @@ static jobject JVM_TurnToGlobal(JNIEnv *env, jobject local);
 static char* JVM_GetException(JNIEnv *env);
 static JVM_ThreadLocalData* JVM_GetThreadLocalData(JVM_ExecutionCtx* jectx);
 static void JVM_ThreadLocalDataRestor(JVM_ThreadLocalData* jvm_ltd, JVM_ExecutionCtx* jectx);
-static JVMRunSession* JVM_SessionCreate(const char* id, const char* jarBytes, size_t len, char** err);
+static JVMRunSession* JVM_SessionCreate(const char* id, const char* mainClassName, const char* jarBytes, size_t len, char** err);
 static void JVM_ThreadPoolWorkerHelper(JNIEnv *env, jobject objectOrClass, jlong ctx);
 static void JVM_ClassLoaderFinalized(JNIEnv *env, jobject objectOrClass, jlong ctx);
+static jstring JVM_GetSessionUpgradeData(JNIEnv *env, jobject objectOrClass, jstring sessionId);
 static JVMFlatExecutionSession* JVM_FepSessionCreate(JNIEnv *env, JVMRunSession* s, char** err);
 
 static char* shardUniqueId = NULL;
@@ -145,6 +146,8 @@ typedef struct JVMRunSession{
     char uuid[ID_LEN];
     char uuidStr[STR_ID_LEN];
     char* jarFilePath;
+    char* mainClassName;
+    uint version;
     jobject sessionClsLoader;
 }JVMRunSession;
 
@@ -436,6 +439,12 @@ JNINativeMethod gearsBuilderNativeMethod[] = {
             .signature = "(J)V",
             .fnPtr = JVM_ClassLoaderFinalized,
         },
+        {
+            .name = "getSessionUpgradeData",
+            .signature = "(Ljava/lang/String;)Ljava/lang/String;",
+            .fnPtr = JVM_GetSessionUpgradeData,
+        },
+
     };
 
 static void JVM_SessionAdd(JVMRunSession* s){
@@ -461,6 +470,22 @@ static JVMRunSession* JVM_SessionGet(const char* uuid){
     return ret;
 }
 
+static JVMRunSession* JVM_SessionGetFromStrId(const char* id){
+    char realId[ID_LEN] = {0};
+    if(strlen(id) < REDISMODULE_NODE_ID_LEN + 2){
+        return NULL;
+    }
+    if(id[REDISMODULE_NODE_ID_LEN] != '-'){
+        return NULL;
+    }
+    memcpy(realId, id, REDISMODULE_NODE_ID_LEN);
+    int match = sscanf(id + REDISMODULE_NODE_ID_LEN + 1, "%lld", (long long*)(&realId[REDISMODULE_NODE_ID_LEN]));
+    if(match != 1){
+        return NULL;
+    }
+    return JVM_SessionGet(realId);
+}
+
 static void JVM_SessionFreeMemory(JVMRunSession* s){
     RedisModule_Assert(!s->sessionClsLoader);
     RedisModule_Assert(s->refCount == 0);
@@ -471,6 +496,7 @@ static void JVM_SessionFreeMemory(JVMRunSession* s){
     }
 
     JVM_FREE(s->jarFilePath);
+    JVM_FREE(s->mainClassName);
     JVM_FREE(s);
 }
 
@@ -538,6 +564,8 @@ static void* JVM_FepSessionDup(void* arg){
 static int JVM_SessionSerialize(FlatExecutionPlan* fep, void* arg, Gears_BufferWriter* bw, char** err){
     JVMRunSession* s = arg;
 
+    RedisGears_BWWriteBuffer(bw, s->mainClassName, strlen(s->mainClassName) + 1); // +1 for \0
+    RedisGears_BWWriteLong(bw, s->version);
     RedisGears_BWWriteBuffer(bw, s->uuid, ID_LEN);
 
     FILE *f = fopen(s->jarFilePath, "rb");
@@ -577,6 +605,11 @@ static void* JVM_SessionDeserialize(FlatExecutionPlan* fep, Gears_BufferReader* 
         *err = JVM_STRDUP("Missmatch jvm session version, update to newest JVM module");
         return NULL;
     }
+    size_t mainClassNameLen;
+    const char* mainClassName = RedisGears_BRReadBuffer(br, &mainClassNameLen);
+
+    uint sessionVersion = RedisGears_BRReadLong(br);
+
     size_t idLen;
     const char* id = RedisGears_BRReadBuffer(br, &idLen);
     RedisModule_Assert(idLen == ID_LEN);
@@ -587,7 +620,8 @@ static void* JVM_SessionDeserialize(FlatExecutionPlan* fep, Gears_BufferReader* 
     JVMRunSession* s = JVM_SessionGet(id);
     // if sessionClsLoader is NULL the session is basically waiting to be free
     if(!s){
-        s = JVM_SessionCreate(id, data, dataLen, err);
+        s = JVM_SessionCreate(id, mainClassName, data, dataLen, err);
+        s->version = sessionVersion;
     }else{
         s = JVM_SessionDup(s);
     }
@@ -606,7 +640,12 @@ static void* JVM_FepSessionDeserialize(FlatExecutionPlan* fep, Gears_BufferReade
 
 static char* JVM_FepSessionToString(void* arg){
     JVMFlatExecutionSession* fepSession = arg;
-    return JVM_STRDUP(fepSession->session->uuidStr);
+    char* res;
+    JVM_asprintf(&res, "{'MainClassName':'%s', 'SessionId':'%s', 'JarFilePath', '%s'}",
+            fepSession->session->mainClassName,
+            fepSession->session->uuidStr,
+            fepSession->session->jarFilePath);
+    return res;
 }
 
 static JVMFlatExecutionSession* JVM_FepSessionCreate(JNIEnv *env, JVMRunSession* s, char** err){
@@ -638,7 +677,7 @@ static JVMFlatExecutionSession* JVM_FepSessionCreate(JNIEnv *env, JVMRunSession*
     return fepSession;
 }
 
-static JVMRunSession* JVM_SessionCreate(const char* id, const char* jarBytes, size_t len, char** err){
+static JVMRunSession* JVM_SessionCreate(const char* id, const char* mainClassName, const char* jarBytes, size_t len, char** err){
     int ret = RedisGears_ExecuteCommand(NULL, "verbose", "mkdir -p %s/%s-jars", workingDir, shardUniqueId);
     if(ret != 0){
         *err = JVM_STRDUP("Failed create jar directory");
@@ -647,6 +686,10 @@ static JVMRunSession* JVM_SessionCreate(const char* id, const char* jarBytes, si
 
     JVMRunSession* s = JVM_ALLOC(sizeof(*s));
     RedisGears_GetShardUUID((char*)id, s->uuid, s->uuidStr, &sessionsId);
+
+    s->mainClassName = JVM_STRDUP(mainClassName);
+
+    s->version = 0;
 
     s->refCount = 1;
 
@@ -1252,6 +1295,56 @@ typedef struct JVM_ThreadPool{
 }JVM_ThreadPool;
 
 ExecutionThreadPool* jvmExecutionPool = NULL;
+
+static jstring JVM_GetSessionUpgradeData(JNIEnv *env, jobject objectOrClass, jstring sessionId){
+    if(!sessionId){
+        (*env)->ThrowNew(env, exceptionCls, "NULL session id given");
+        return NULL;
+    }
+
+    RedisModuleCtx *ctx = RedisModule_GetThreadSafeContext(NULL);
+    RedisGears_LockHanlderAcquire(ctx);
+
+    const char* sessionIdStr = (*env)->GetStringUTFChars(env, sessionId, NULL);
+    JVMRunSession* s = JVM_SessionGetFromStrId(sessionIdStr);
+    (*env)->ReleaseStringUTFChars(env, sessionId, sessionIdStr);
+
+    if(!s){
+        goto error;
+    }
+
+    jstring clsNameJString = (*env)->NewStringUTF(env, s->mainClassName);
+
+    jclass cls = (*env)->CallObjectMethod(env, s->sessionClsLoader, javaLoadClassNewMid, clsNameJString);
+
+    char* err = NULL;
+    if((err = JVM_GetException(env))){
+        goto error;
+    }
+
+    jmethodID upgradeMethodID = (*env)->GetStaticMethodID(env, cls, "getUpgradeData", "()Ljava/lang/String;");
+
+    if((err = JVM_GetException(env))){
+        goto error;
+    }
+
+    jstring result = (*env)->CallStaticObjectMethod(env, cls, upgradeMethodID);
+
+    if((err = JVM_GetException(env))){
+        goto error;
+    }
+
+    RedisGears_LockHanlderRelease(ctx);
+    RedisModule_FreeThreadSafeContext(ctx);
+
+    return result;
+
+error:
+    RedisGears_LockHanlderRelease(ctx);
+    RedisModule_FreeThreadSafeContext(ctx);
+    (*env)->ThrowNew(env, exceptionCls, err);
+    return NULL;
+}
 
 static void JVM_ClassLoaderFinalized(JNIEnv *env, jobject objectOrClass, jlong ctx){
     JVMRunSession* s = (JVMRunSession*)ctx;
@@ -2034,12 +2127,17 @@ static void JVM_GBRun(JNIEnv *env, jobject objectOrClass, jobject reader){
 }
 
 static jobject JVM_GBExecuteParseReply(JNIEnv *env, RedisModuleCallReply *reply){
+    char* err = NULL;
     if(RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ARRAY){
         jobject ret = (*env)->NewObjectArray(env, RedisModule_CallReplyLength(reply), gearsObjectCls, NULL);
         for(size_t i = 0 ; i < RedisModule_CallReplyLength(reply) ; ++i){
             RedisModuleCallReply *subReply = RedisModule_CallReplyArrayElement(reply, i);
             jobject val = JVM_GBExecuteParseReply(env, subReply);
             (*env)->SetObjectArrayElement(env, ret, i, val);
+            if((err = JVM_GetException(env))){
+                ret = (*env)->NewStringUTF(env, err);
+                break;
+            }
         }
         return ret;
     }
@@ -2058,6 +2156,9 @@ static jobject JVM_GBExecuteParseReply(JNIEnv *env, RedisModuleCallReply *reply)
     if(RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_INTEGER){
         long long val = RedisModule_CallReplyInteger(reply);
         jobject ret = (*env)->CallStaticObjectMethod(env, gearsLongCls, gearsLongValueOfMethodId, val);
+        if((err = JVM_GetException(env))){
+            ret = (*env)->NewStringUTF(env, err);
+        }
         return ret;
     }
     return NULL;
@@ -2370,7 +2471,7 @@ int JVM_RunGC(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
     return REDISMODULE_OK;
 }
 
-int JVM_DumpClsLoaders(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
+int JVM_DumpSessions(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
     if(argc != 1){
         return RedisModule_WrongArity(ctx);
     }
@@ -2383,9 +2484,13 @@ int JVM_DumpClsLoaders(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
     JVMRunSession* s;
     RedisModule_ReplyWithArray(ctx, RedisModule_DictSize(JVMSessions));
     while((key = RedisModule_DictNextC(iter, &keyLen, (void**)&s))){
-        RedisModule_ReplyWithArray(ctx, 6);
+        RedisModule_ReplyWithArray(ctx, 10);
         RedisModule_ReplyWithCString(ctx, "id");
         RedisModule_ReplyWithCString(ctx, s->uuidStr);
+        RedisModule_ReplyWithCString(ctx, "mainClassName");
+        RedisModule_ReplyWithCString(ctx, s->mainClassName);
+        RedisModule_ReplyWithCString(ctx, "version");
+        RedisModule_ReplyWithLongLong(ctx, s->version);
         RedisModule_ReplyWithCString(ctx, "jar");
         RedisModule_ReplyWithCString(ctx, s->jarFilePath);
         RedisModule_ReplyWithCString(ctx, "refCount");
@@ -2407,7 +2512,7 @@ int JVM_Run(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
     size_t bytesLen;
     const char* bytes = RedisModule_StringPtrLen(argv[2], &bytesLen);
 
-    JVMRunSession* s = JVM_SessionCreate(NULL, bytes, bytesLen, &err);
+    JVMRunSession* s = JVM_SessionCreate(NULL, clsName, bytes, bytesLen, &err);
     if(!s){
         if(!err){
             err = JVM_STRDUP("Failed creating session");
@@ -2435,6 +2540,19 @@ int JVM_Run(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
         goto error;
     }
 
+    jfieldID versionField = (*env)->GetStaticFieldID(env, cls, "VERSION", "I");
+
+    if((err = JVM_GetException(env)) || !versionField){
+        RedisModule_Log(NULL, "debug", "No field id found of class %s, err='%s'", clsName, err? err : "NULL");
+        versionField = 0;
+        if(err){
+            JVM_FREE(err);
+        }
+    }
+
+    if(versionField){
+        s->version = (*env)->GetStaticIntField(env, cls, versionField);
+    }
 
     jmethodID mid = (*env)->GetStaticMethodID(env, cls, "main", "([Ljava/lang/String;)V");
 
@@ -3515,8 +3633,8 @@ int RedisGears_OnLoad(RedisModuleCtx *ctx) {
         return REDISMODULE_ERR;
     }
 
-    if (RedisModule_CreateCommand(ctx, "rg.jdumpclsloaders", JVM_DumpClsLoaders, "readonly", 0, 0, 0) != REDISMODULE_OK) {
-        RedisModule_Log(ctx, "warning", "could not register command rg.jdumpclsloaders");
+    if (RedisModule_CreateCommand(ctx, "rg.jdumpsessions", JVM_DumpSessions, "readonly", 0, 0, 0) != REDISMODULE_OK) {
+        RedisModule_Log(ctx, "warning", "could not register command rg.jdumpsessions");
         return REDISMODULE_ERR;
     }
 

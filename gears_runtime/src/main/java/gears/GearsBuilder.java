@@ -463,6 +463,13 @@ public class GearsBuilder<T extends Serializable>{
 	 * @return - registration id
 	 */
 	private native String innerRegister(BaseReader<T> reader, ExecutionMode mode, OnRegisteredOperation onRegister, OnUnregisteredOperation onUnregistered);
+
+	/**
+	 * 
+	 * @param sessionId
+	 * @return
+	 */
+	public static native String getSessionUpgradeData(String sessionId);
 	
 	/**
 	 * Runs the current built pipe

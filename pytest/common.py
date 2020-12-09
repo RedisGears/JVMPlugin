@@ -141,8 +141,9 @@ def jvmTestDecorator(preExecute=None, postExecution=None, envArgs={}):
             conn = getConnectionByEnv(env)
             if env.debugger is not None:
                 # set ExecutionMaxIdleTime to 200 seconds
-                print(Colors.Gray('\tRunning with debugger (valgrind), set ExecutionMaxIdleTime to 200 seconds'))
-                res = env.cmd('RG.PYEXECUTE', "GB('ShardsIDReader').map(lambda x: execute('RG.CONFIGSET', 'ExecutionMaxIdleTime', '200000')).run()")
+                print(Colors.Gray('\tRunning with debugger (valgrind), set ExecutionMaxIdleTime to 200 seconds and cluster-node-timeout to 30 seconds'))
+                res = env.cmd('RG.PYEXECUTE', "GB('ShardsIDReader').map(lambda x: execute('RG.CONFIGSET', 'ExecutionMaxIdleTime', '200000'))\
+                              .map(lambda x: execute('CONFIG', 'set', 'cluster-node-timeout', '30000')).run()")
             executionError = None
             res = [[],[]]
             if preExecute is not None:
@@ -174,6 +175,7 @@ def jvmTestDecorator(preExecute=None, postExecution=None, envArgs={}):
                 'executionError': executionError,
                 'conn': conn
             }
+
             testFunc(**kargs)
 
             if postExecution is not None:
