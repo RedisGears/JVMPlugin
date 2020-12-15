@@ -1766,7 +1766,7 @@ static void JVM_ScanKeyCallback(RedisModuleKey *key, RedisModuleString *field, R
     RedisGears_BWWriteBuffer(bw, valCStr, valCStrLen);
 }
 
-static jobject JVM_GetSerializedVal(JNIEnv *env, RedisModuleKey* keyPtr, Gears_Buffer* buff){
+static jobject JVM_GetSerializedVal(RedisModuleCtx* rctx, JNIEnv *env, RedisModuleKey* keyPtr, RedisModuleString* key, Gears_Buffer* buff){
     Gears_BufferWriter bw;
     RedisGears_BufferWriterInit(&bw, buff);
     if(keyPtr == NULL){
@@ -1775,14 +1775,44 @@ static jobject JVM_GetSerializedVal(JNIEnv *env, RedisModuleKey* keyPtr, Gears_B
         int keyType = RedisModule_KeyType(keyPtr);
         RedisGears_BWWriteLong(&bw, keyType);
         if(keyType == REDISMODULE_KEYTYPE_HASH){
-            RedisModuleScanCursor* hashCursor = RedisModule_ScanCursorCreate();
-            while(RedisModule_ScanKey(keyPtr, hashCursor, JVM_ScanKeyCallback, &bw));
-            RedisModule_ScanCursorDestroy(hashCursor);
+            if(!RedisGears_IsCrdt()){
+                RedisModuleScanCursor* hashCursor = RedisModule_ScanCursorCreate();
+                while(RedisModule_ScanKey(keyPtr, hashCursor, JVM_ScanKeyCallback, &bw));
+                RedisModule_ScanCursorDestroy(hashCursor);
+            }else{
+                // fall back to RM_Call
+                RedisModuleCallReply *reply = RedisModule_Call(rctx, "HGETALL", "s", key);
+                RedisModule_Assert(RedisModule_CallReplyType(reply) == REDISMODULE_REPLY_ARRAY);
+                size_t len = RedisModule_CallReplyLength(reply);
+                RedisModule_Assert(len % 2 == 0);
+                for(int i = 0 ; i < len ; i+=2){
+                    RedisModuleCallReply *keyReply = RedisModule_CallReplyArrayElement(reply, i);
+                    RedisModuleCallReply *valReply = RedisModule_CallReplyArrayElement(reply, i + 1);
+                    size_t keyStrLen;
+                    const char* keyStr = RedisModule_CallReplyStringPtr(keyReply, &keyStrLen);
+                    size_t valStrLen;
+                    const char* valStr = RedisModule_CallReplyStringPtr(valReply, &valStrLen);
+                    RedisGears_BWWriteBuffer(&bw, keyStr, keyStrLen);
+                    RedisGears_BWWriteBuffer(&bw, valStr, valStrLen);
+                }
+                RedisModule_FreeCallReply(reply);
+            }
         }
         if(keyType == REDISMODULE_KEYTYPE_STRING){
             size_t len;
-            const char* val = RedisModule_StringDMA(keyPtr, &len, REDISMODULE_READ);
+            const char* val;
+            RedisModuleCallReply *r = NULL;
+            if(!RedisGears_IsCrdt()){
+                val = RedisModule_StringDMA(keyPtr, &len, REDISMODULE_READ);
+            }else{
+                // fall back to RM_Call
+                RedisModuleCallReply *r = RedisModule_Call(rctx, "GET", "s", key);
+                val = (char*)RedisModule_CallReplyStringPtr(r, &len);
+            }
             RedisGears_BWWriteBuffer(&bw, val, len);
+            if(r){
+                RedisModule_FreeCallReply(r);
+            }
         }
     }
     size_t len;
@@ -1810,7 +1840,7 @@ static Record* JVM_KeyReaderReadRecord(RedisModuleCtx* rctx, RedisModuleString* 
         if(!tmpPtr){
             tmpPtr = RedisModule_OpenKey(rctx, key, REDISMODULE_READ);
         }
-        serializedValue = JVM_GetSerializedVal(env, tmpPtr, recordBuff);
+        serializedValue = JVM_GetSerializedVal(rctx, env, tmpPtr, key, recordBuff);
         if(!keyPtr){
             RedisModule_CloseKey(tmpPtr);
         }
