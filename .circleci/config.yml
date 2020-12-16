@@ -102,7 +102,7 @@ jobs:
             name: Build docker and push to Dockerhub
             command: |
               docker login -u redisfab -p $DOCKER_REDISFAB_PWD
-              docker build -t redisgearsjvm:edge .
+              docker build -t redisfab/redisgearsjvm:edge .
               docker push redisfab/redisgearsjvm:edge
   deploy_snapshots:
       docker:
