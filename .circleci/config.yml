@@ -81,6 +81,29 @@ jobs:
             root: artifacts
             paths:
               - 'snapshot/*.tgz'
+  build-docker:
+      docker:
+        - image: 'ubuntu:bionic'
+      steps:
+        - run:
+            name: Setup executor
+            command: |
+              apt-get -qq update
+              apt-get -q install -y git openssh-client curl ca-certificates
+              bash <(curl -fsSL https://get.docker.com)
+        - setup_remote_docker:
+            docker_layer_caching: true 
+        - checkout
+        - run:
+            name: Checkout submodules
+            command: |
+              git submodule update --init --recursive
+        - run:
+            name: Build docker and push to Dockerhub
+            command: |
+              docker login -u redisfab -p $DOCKER_REDISFAB_PWD
+              docker build -t redisgearsjvm:edge .
+              docker push redisfab/redisgearsjvm:edge
   deploy_snapshots:
       docker:
         - image: redisfab/rmbuilder:6.0.9-x64-buster
@@ -118,6 +141,8 @@ workflows:
           <<: *on-any-branch
       - build-and-test-centos:
           <<: *on-any-branch
+      - build-docker:
+          <<: *on-master
       - deploy_snapshots:
           <<: *after-build-and-test
           <<: *on-master
