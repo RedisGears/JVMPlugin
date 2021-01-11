@@ -8,7 +8,7 @@ echo "installing redisgears for :" $OS
 
 WORK_DIR=./bin/RedisGears/
 REDISGEARS_ZIP=redisgears.linux-$OS-x64.master.zip
-REDISGEARS_DEPS=redisgears-dependencies.linux-$OS-x64.master.tgz
+REDISGEARS_DEPS=redisgears-python.linux-$OS-x64.master.tgz
 REDISGEARS_S3_PATH=http://redismodules.s3.amazonaws.com/redisgears/snapshots/$REDISGEARS_ZIP
 REDISGEARS_DEPS_S3_PATH=http://redismodules.s3.amazonaws.com/redisgears/snapshots/$REDISGEARS_DEPS
 
