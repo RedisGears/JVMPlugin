@@ -23,7 +23,7 @@ jobs:
         - setup-automation
         - run:
             name: Install Redis
-            command: ./deps/readies/bin/getredis --version 6
+            command: python3 ./deps/readies/bin/getredis --version 6
         - run:
             name: Install RLTest
             command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
