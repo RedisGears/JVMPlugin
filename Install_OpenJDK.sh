@@ -1,3 +1,9 @@
+#!/bin/bash
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+ROOT=$HERE
+export READIES=$ROOT/deps/readies
+
 echo "installing OpenJDK"
 
 WORK_DIR=./bin/OpenJDK/
@@ -6,7 +12,7 @@ OPEN_JDK_URL=https://github.com/AdoptOpenJDK/openjdk11-binaries/releases/downloa
 
 mkdir -p $WORK_DIR
 
-if [ -f "$WORK_DIR$OPEN_JDK_ZIP" ]; then
+if [[ -f "$WORK_DIR$OPEN_JDK_ZIP" ]]; then
     echo "Skiping OpenJDK download"
 else 
     echo "Download OpenJDK"
