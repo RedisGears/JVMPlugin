@@ -18,7 +18,7 @@ jobs:
             name: Setup executor
             command: |
               apt-get -qq update
-              apt-get -q install -y git openssh-client curl ca-certificates make tar gzip unzip python-pip maven
+              apt-get -q install -y git openssh-client curl ca-certificates make tar gzip unzip maven
         - checkout
         - setup-automation
         - run:
@@ -44,7 +44,7 @@ jobs:
         - run:
             name: Setup executor
             command: |
-              yum install -y git openssh-client curl ca-certificates make tar gzip python-devel unzip maven
+              yum install -y git openssh-client curl ca-certificates make tar gzip unzip maven
         - checkout
         - setup-automation
         - run:
