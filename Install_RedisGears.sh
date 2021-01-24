@@ -4,7 +4,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 ROOT=$HERE
 export READIES=$ROOT/deps/readies
 
-OS=$($READIES/bin/platform --os)
+OS=$($READIES/bin/platform --osnick)
 
 echo "installing redisgears for: $OS"
 
