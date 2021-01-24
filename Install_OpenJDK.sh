@@ -16,6 +16,6 @@ if [[ -f "$WORK_DIR$OPEN_JDK_ZIP" ]]; then
     echo "Skiping OpenJDK download"
 else 
     echo "Download OpenJDK"
-    wget -P $WORK_DIR $OPEN_JDK_URL
-    tar -C $WORK_DIR -xvf $WORK_DIR$OPEN_JDK_ZIP
+    wget -q -P $WORK_DIR $OPEN_JDK_URL
+    tar -C $WORK_DIR -xf $WORK_DIR$OPEN_JDK_ZIP
 fi
