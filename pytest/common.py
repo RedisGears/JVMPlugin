@@ -1,7 +1,10 @@
-from RLTest import Env
+from RLTest import Env, Defaults
 import json
 import signal
 import time
+
+
+Defaults.decode_responses = True
 
 
 class TimeLimit(object):
