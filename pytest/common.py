@@ -1,7 +1,10 @@
-from RLTest import Env
+from RLTest import Env, Defaults
 import json
 import signal
 import time
+
+
+Defaults.decode_responses = True
 
 
 class TimeLimit(object):
@@ -135,7 +138,7 @@ GB('ShardsIDReader').map(lambda x: len(execute('RG.DUMPEXECUTIONS'))).filter(lam
 def jvmTestDecorator(preExecute=None, postExecution=None, envArgs={}):
     def jvmTest(testFunc):
         def jvmTestFunc():
-            testName = 'gears_tests.%s' % testFunc.func_name 
+            testName = 'gears_tests.%s' % testFunc.__name__ 
             print(Colors.Cyan('\tRunning: %s' % testName))
             env = Env(testName = testName, **envArgs)
             conn = getConnectionByEnv(env)
