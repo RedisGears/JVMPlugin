@@ -46,15 +46,15 @@ RLTEST_ARGS=$(readarray -t A < $argsf; IFS=' '; echo "${A[*]}")
 rm -f $argsf
 
 echo oss
-python3 -m RLTest $RLTEST_ARGS "$@"
+eval python3 -m RLTest $RLTEST_ARGS "$@"
 
 echo cluster 1 shard
-python3 -m RLTest $RLTEST_ARGS --env oss-cluster --shards-count 1 "$@"
+eval python3 -m RLTest $RLTEST_ARGS --env oss-cluster --shards-count 1 "$@"
 
 echo cluster 2 shards
-python3 -m RLTest $RLTEST_ARGS --env oss-cluster --shards-count 2 "$@"
+eval python3 -m RLTest $RLTEST_ARGS --env oss-cluster --shards-count 2 "$@"
 
 echo cluster 3 shards
-python3 -m RLTest $RLTEST_ARGS --env oss-cluster --shards-count 3 "$@"
+eval python3 -m RLTest $RLTEST_ARGS --env oss-cluster --shards-count 3 "$@"
 
 rm -rf $ROOT/bin/RedisGears/.venv-*
