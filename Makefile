@@ -1,29 +1,31 @@
-OS=$(shell ./deps/readies/bin/platform --osnick)
-GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
-$(info OS=$(OS))
+
+JVM_PATH=./bin/OpenJDK/jdk-11.0.9.1+1/
+GEARS_PATH=./bin/RedisGears/redisgears.so
+JVM_PLUGIN_PATH=./src/gears_jvm.so
+JVM_PLUGIN_CLASSPATH=./gears_runtime/target/gear_runtime-jar-with-dependencies.jar
 
 all: gears_jvm
 
 gears_jvm: InstallRedisGears InstallOpenJDK GearsRuntime
-	make -C ./src/
+	make -C src
 	
 InstallRedisGears:
-	OS=$(OS) /bin/bash ./Install_RedisGears.sh
+	./Install_RedisGears.sh
 	
 InstallOpenJDK:
-	/bin/bash ./Install_OpenJDK.sh
+	./Install_OpenJDK.sh
 	
 GearsRuntime:  
 	cd gears_runtime; mvn package
 
 clean:
-	make -C ./src/ clean
+	make -C src clean
 	
 tests: gears_jvm
-	cd ./pytest; ./run_test.sh
-	
+	cd pytest; ./run_test.sh
+
 run: gears_jvm
-	redis-server --loadmodule ./bin/RedisGears/redisgears.so Plugin ./src/gears_jvm.so JvmOptions "-Djava.class.path=./gears_runtime/target/gear_runtime-jar-with-dependencies.jar" JvmPath ./bin/OpenJDK/jdk-11.0.9.1+1/
+	redis-server --loadmodule $(GEARS_PATH) Plugin $(JVM_PLUGIN_PATH) JvmOptions "-Djava.class.path=$(JVM_PLUGIN_CLASSPATH)" JvmPath $(JVM_PATH)
 	
 pack: gears_jvm
-	OS=$(OS) GIT_BRANCH=$(GIT_BRANCH) ./pack.sh
+	./pack.sh

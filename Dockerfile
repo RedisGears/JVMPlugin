@@ -1,6 +1,6 @@
 FROM ubuntu:bionic
-RUN apt update
-RUN apt install -y build-essential wget unzip maven
+RUN apt-get update -qq
+RUN apt-get install -q -y build-essential wget unzip maven
 
 WORKDIR /build
 

@@ -1,83 +1,64 @@
 version: 2.1
 
 commands: 
+  setup-executor:
+    steps:
+      - run:
+          name: Setup executor
+          command: |
+            apt-get -qq update
+            apt-get -q install -y git openssh-client curl ca-certificates make tar gzip
+            bash <(curl -fsSL https://get.docker.com)
+      - setup_remote_docker:
+          docker_layer_caching: true
+
   setup-automation:
     steps:
       - run:
           name: Setup automation
           command: |
-            git submodule update --init --recursive
             ./deps/readies/bin/getpy3
+            python3 ./system-setup.py
+
+  build-and-test-steps:
+    steps:
+      - checkout
+      - run:
+          name: Checkout submodules
+          command: git submodule update --init --recursive
+      - setup-automation
+      - run:
+          name: Install Redis
+          command: ./deps/readies/bin/getredis --version 6
+      - run:
+          name: Tests
+          command: make tests
+      - run:
+          name: Pack
+          command: make pack
+      - persist_to_workspace:
+          root: artifacts
+          paths:
+            - 'snapshot/*.tgz'
 
 jobs:
   build-and-test-bionic:
       docker:
-        - image: 'ubuntu:bionic'
+        - image: redisfab/rmbuilder:6.0.9-x64-bionic
       steps:
-        - run:
-            name: Setup executor
-            command: |
-              apt-get -qq update
-              apt-get -q install -y git openssh-client curl ca-certificates make tar gzip unzip maven
-        - checkout
-        - setup-automation
-        - run:
-            name: Install Redis
-            command: python3 ./deps/readies/bin/getredis --version 6
-        - run:
-            name: Install RLTest
-            command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
-        - run:
-            name: Tests
-            command: make tests
-        - run:
-            name: Pack
-            command: make pack
-        - persist_to_workspace:
-            root: artifacts
-            paths:
-              - 'snapshot/*.tgz'
+        - build-and-test-steps
+
   build-and-test-centos:
       docker:
-        - image: centos:7.8.2003
+        - image: redisfab/rmbuilder:6.0.9-x64-centos7
       steps:
-        - run:
-            name: Setup executor
-            command: |
-              yum install -y git openssh-client curl ca-certificates make tar gzip unzip maven
-        - checkout
-        - setup-automation
-        - run:
-            name: Install gcc
-            command: ./deps/readies/bin/getgcc --modern
-        - run:
-            name: Install Redis
-            command: . /etc/profile.d/scl-devtoolset-9.sh; python3 ./deps/readies/bin/getredis --version 6
-        - run:
-            name: Install RLTest
-            command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
-        - run:
-            name: Tests
-            command: make tests
-        - run:
-            name: Pack
-            command: make pack
-        - persist_to_workspace:
-            root: artifacts
-            paths:
-              - 'snapshot/*.tgz'
+        - build-and-test-steps
+
   build-docker:
       docker:
-        - image: 'ubuntu:bionic'
+        - image: ubuntu:bionic
       steps:
-        - run:
-            name: Setup executor
-            command: |
-              apt-get -qq update
-              apt-get -q install -y git openssh-client curl ca-certificates
-              bash <(curl -fsSL https://get.docker.com)
-        - setup_remote_docker:
-            docker_layer_caching: true 
+        - setup-executor
         - checkout
         - run:
             name: Checkout submodules
@@ -89,6 +70,7 @@ jobs:
               docker login -u redisfab -p $DOCKER_REDISFAB_PWD
               docker build -t redisfab/redisgearsjvm:edge .
               docker push redisfab/redisgearsjvm:edge
+
   deploy_snapshots:
       docker:
         - image: redisfab/rmbuilder:6.0.9-x64-buster
@@ -101,6 +83,8 @@ jobs:
               for f in artifacts/snapshot/*.tgz; do
                 aws s3 cp $f s3://redismodules/redisgears_plugins/jvm_plugin/snapshots/ --acl public-read
               done
+
+
 on-any-branch: &on-any-branch
   filters:
     branches:
