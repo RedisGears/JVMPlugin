@@ -16,7 +16,7 @@ InstallOpenJDK:
 	./Install_OpenJDK.sh
 	
 GearsRuntime:  
-	cd gears_runtime; mvn package
+	cd gears_runtime; mvn package -q
 
 clean:
 	make -C src clean

@@ -8,7 +8,7 @@ OS=$($READIES/bin/platform --osnick)
 
 echo "installing redisgears for: $OS"
 
-WORK_DIR=./bin/RedisGears/
+WORK_DIR=./bin/RedisGears
 REDISGEARS_ZIP=redisgears.linux-$OS-x64.master.zip
 REDISGEARS_DEPS=redisgears-python.linux-$OS-x64.master.tgz
 REDISGEARS_S3_PATH=http://redismodules.s3.amazonaws.com/redisgears/snapshots/$REDISGEARS_ZIP
@@ -29,5 +29,5 @@ if [[ -f "$WORK_DIR$REDISGEARS_DEPS" ]]; then
 else 
     echo "Download RedisGears deps"
     wget -q -P $WORK_DIR $REDISGEARS_DEPS_S3_PATH
-    tar -C $WORK_DIR --no-same-owner -xf $WORK_DIR$REDISGEARS_DEPS
+    tar -C $WORK_DIR --no-same-owner -xf $WORK_DIR/$REDISGEARS_DEPS
 fi

@@ -7,7 +7,7 @@ WORKDIR /build
 ADD . /build
 
 RUN ./deps/readies/bin/getpy3
-
+RUN python ./system-setup.py
 RUN ./deps/readies/bin/getredis --version 6
 
 RUN make all

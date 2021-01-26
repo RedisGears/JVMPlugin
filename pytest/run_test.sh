@@ -7,9 +7,9 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 ROOT=$(cd $HERE/..; pwd)
 export READIES=$ROOT/deps/readies
 
-mkdir -p $ROOT/gears_tests/build
-cd $ROOT/gears_tests/build
-$ROOT/bin/OpenJDK/jdk-11.0.9.1+1/bin/javac -d ./ -classpath $ROOT/gears_runtime/target/gear_runtime-jar-with-dependencies.jar $ROOT/src/gears_tests/*
+mkdir -p $ROOT/pytest/gears_tests/build
+cd $ROOT/pytest/gears_tests/build
+$ROOT/bin/OpenJDK/jdk-11.0.9.1+1/bin/javac -d ./ -classpath $ROOT/gears_runtime/target/gear_runtime-jar-with-dependencies.jar $ROOT/pytest/gears_tests/src/gears_tests/*.java
 $ROOT/bin/OpenJDK/jdk-11.0.9.1+1/bin/jar -cvf gears_tests.jar ./gears_tests/
 cd $ROOT
 
@@ -28,15 +28,21 @@ JVM_PATH=$ROOT/bin/OpenJDK/jdk-11.0.9.1+1/
 SRC=$ROOT/src
 BIN=$ROOT/bin
 
-RLTEST_ARGS=\
-	--module $BIN/RedisGears/redisgears.so \
-	--module-args \
-		"Plugin $SRC/gears_jvm.so \
-		JvmPath $JVM_PATH JvmOptions $JVM_OPTIONS \
-		Plugin $BIN/RedisGears/plugin/gears_python.so \
-		CreateVenv 0 \
-		PythonInstallationDir $BIN/RedisGears/" \
+argsf=$(mktemp /tmp/jojo.XXXXXX)
+cat <<EOF > $argf
+	--module $BIN/RedisGears/redisgears.so
+	--module-args "
+		Plugin $SRC/gears_jvm.so
+		JvmPath $JVM_PATH JvmOptions $JVM_OPTIONS
+		Plugin $BIN/RedisGears/plugin/gears_python.so
+		CreateVenv 0
+		PythonInstallationDir $BIN/RedisGears/
+		"
 	--clear-logs
+EOF
+
+RLTEST_ARGS=$(readarray -t A < $argsf; IFS=' '; echo "${A[*]}")
+rm -f $f
 
 echo oss
 python3 -m RLTest $RLTEST_ARGS "$@"
