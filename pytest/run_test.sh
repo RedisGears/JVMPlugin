@@ -45,6 +45,8 @@ EOF
 RLTEST_ARGS=$(readarray -t A < $argsf; IFS=' '; echo "${A[*]}")
 rm -f $argsf
 
+cd $ROOT/pytest
+
 echo oss
 eval python3 -m RLTest $RLTEST_ARGS "$@"
 
