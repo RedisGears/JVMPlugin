@@ -29,5 +29,5 @@ if [[ -f "$WORK_DIR$REDISGEARS_DEPS" ]]; then
 else 
     echo "Download RedisGears deps"
     wget -q -P $WORK_DIR $REDISGEARS_DEPS_S3_PATH
-    tar -C $WORK_DIR -xf $WORK_DIR$REDISGEARS_DEPS
+    tar -C $WORK_DIR --no-same-owner -xf $WORK_DIR$REDISGEARS_DEPS
 fi

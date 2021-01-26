@@ -17,8 +17,8 @@ commands:
       - run:
           name: Setup automation
           command: |
-            git submodule update --init --recursive
             ./deps/readies/bin/getpy3
+            python3 ./system-setup.py
 
   build-and-test-steps:
     steps:

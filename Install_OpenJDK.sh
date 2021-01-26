@@ -17,5 +17,5 @@ if [[ -f "$WORK_DIR$OPEN_JDK_ZIP" ]]; then
 else 
     echo "Download OpenJDK"
     wget -q -P $WORK_DIR $OPEN_JDK_URL
-    tar -C $WORK_DIR -xf $WORK_DIR$OPEN_JDK_ZIP
+    tar -C $WORK_DIR --no-same-owner -xf $WORK_DIR$OPEN_JDK_ZIP
 fi
