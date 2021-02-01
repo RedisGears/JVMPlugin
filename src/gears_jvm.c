@@ -3128,6 +3128,7 @@ static int JVMRecord_SendReply(Record* base, RedisModuleCtx* rctx){
         size_t len = 0;
         RedisModule_ReplyWithArray(rctx, REDISMODULE_POSTPONED_ARRAY_LEN);
         JVMRecord* innerRecord = (JVMRecord*)RedisGears_RecordCreate(JVMRecordType);
+        innerRecord->obj = NULL;
 
         while((*env)->CallBooleanMethod(env, iterator, iteratorHasNextMethodId)){
             ++len;
