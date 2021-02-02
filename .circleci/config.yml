@@ -150,9 +150,11 @@ workflows:
       - build-docker:
           <<: *on-master
       - deploy_snapshots:
+          context: aws
           <<: *after-build-and-test
           <<: *on-master
       - deploy_release:
+          context: aws
           <<: *after-build-and-test
           <<: *on-version-tags
 
