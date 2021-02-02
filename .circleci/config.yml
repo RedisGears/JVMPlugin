@@ -148,13 +148,14 @@ workflows:
       - build-and-test-centos:
           <<: *on-any-branch
       - build-docker:
+          context: common
           <<: *on-master
       - deploy_snapshots:
-          context: aws
+          context: common
           <<: *after-build-and-test
           <<: *on-master
       - deploy_release:
-          context: aws
+          context: common
           <<: *after-build-and-test
           <<: *on-version-tags
 
