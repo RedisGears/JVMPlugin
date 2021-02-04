@@ -136,11 +136,11 @@ public class GearsBuilder<T extends Serializable>{
 	
 	public GearsBuilder<T> asyncForeach(AsyncForeachOperation<T> foreach){
 		this.foreach(r->{				
-			GearsFuture<T> f = foreach.foreach(r);
+			GearsFuture<Serializable> f = foreach.foreach(r);
 			if(f == null) {
 				throw new Exception("null future returned");
 			}
-			new FutureRecord<T>(f);
+			new FutureRecord<Serializable>(f);
 		});
 		
 		return this;
@@ -385,12 +385,52 @@ public class GearsBuilder<T extends Serializable>{
 	public static native Object callNextArray(String[] args);
 	
 	/**
+	 * On keys reader, if commands options was used, it is possible to get the
+	 * command associated with the notification. The command is an array of 
+	 * byte[] (just in case a blob was sent and its not a valid string).
+	 * @return - the command associated with the notification
+	 */
+	public static native byte[][] getCommand();
+	
+	/**
+	 * On keys reader, if commands options was used, it is possible to override
+	 * the reply of the command associated with the notification.
+	 * In case override the reply is not possible, an exception will be raised 
+	 * @param reply - new reply
+	 */
+	public static native void overrideReply(Object reply);
+	
+	/**
 	 * Write a log message to the redis log file
 	 * 
 	 * @param msg - the message to write
 	 * @param level - the log level
 	 */
 	public static native void log(String msg, LogLevel level);
+	
+	/**
+	 * Whether or not to avoid keys notification.
+	 * Return the old value 
+	 * Usage Example :
+	 * <pre>{@code
+	 *  	boolean oldVal = GearsBuilder.setAvoidNotifications(true);
+	 *      ...
+	 *      GearsBuilder.setAvoidNotifications(oldVal);
+	 * }</pre>
+	 * @param val - true: notifications disabled, false: notifications enabled 
+	 * @return - the old value
+	 */
+	public static native boolean setAvoidNotifications(boolean val);
+	
+	/**
+	 * acquire the Redis global lock
+	 */
+	public static native void acquireRedisGil();
+	
+	/**
+	 * release the Redis global lock
+	 */
+	public static native void releaseRedisGil();
 
 	/**
 	 * Internal use for performance increasment.

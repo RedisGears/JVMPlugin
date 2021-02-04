@@ -19,6 +19,7 @@ public class KeysReader extends BaseReader<KeysReaderRecord> {
 	private boolean readValues;
 	private String[] eventTypes;
 	private String[] keyTypes;
+	private String[] commands;
 
 	/**
 	 * Create a new KeysReader object
@@ -184,6 +185,24 @@ public class KeysReader extends BaseReader<KeysReaderRecord> {
 	 */
 	public KeysReader setKeyTypes(String[] keyTypes) {
 		this.keyTypes = keyTypes;
+		return this;
+	}
+
+	/**
+	 * On register, returns the commands that this reader register on.
+	 * @return
+	 */
+	public String[] getCommands() {
+		return commands;
+	}
+
+	/**
+	 * On register, sets the commands that this reader register on.
+	 * @param commands - the commands that this reader register on.
+	 * @return - the reader
+	 */
+	public KeysReader setCommands(String[] commands) {
+		this.commands = commands;
 		return this;
 	}
 }

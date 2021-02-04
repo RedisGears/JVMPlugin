@@ -31,6 +31,11 @@ static jobject JVM_GBMap(JNIEnv *env, jobject objectOrClass, jobject mapper);
 static void JVM_GBRun(JNIEnv *env, jobject objectOrClass, jobject reader);
 static jobject JVM_GBExecute(JNIEnv *env, jobject objectOrClass, jobjectArray command);
 static jobject JVM_GBCallNext(JNIEnv *env, jobject objectOrClass, jobjectArray command);
+static jobject JVM_GBGetCommand(JNIEnv *env, jobject objectOrClass);
+static void JVM_GBOverriderReply(JNIEnv *env, jobject objectOrClass, jobject reply);
+static jboolean JVM_GBSetAvoidNotifications(JNIEnv *env, jobject objectOrClass, jboolean val);
+static void JVM_GBAcquireRedisGil(JNIEnv *env, jobject objectOrClass);
+static void JVM_GBReleaseRedisGil(JNIEnv *env, jobject objectOrClass);
 static void JVM_GBLog(JNIEnv *env, jobject objectOrClass, jstring msg, jobject logLevel);
 static jstring JVM_GBHashtag(JNIEnv *env, jobject objectOrClass);
 static jstring JVM_GBConfigGet(JNIEnv *env, jobject objectOrClass, jstring key);
@@ -52,6 +57,8 @@ static void JVM_ThreadPoolWorkerHelper(JNIEnv *env, jobject objectOrClass, jlong
 static void JVM_ClassLoaderFinalized(JNIEnv *env, jobject objectOrClass, jlong ctx);
 static jstring JVM_GetSessionUpgradeData(JNIEnv *env, jobject objectOrClass, jstring sessionId);
 static JVMFlatExecutionSession* JVM_FepSessionCreate(JNIEnv *env, JVMRunSession* s, char** err);
+
+static RedisModuleCtx *staticCtx = NULL;
 
 static char* shardUniqueId = NULL;
 static char* workingDir = NULL;
@@ -189,6 +196,7 @@ jfieldID classLoaderPrtField = NULL;
 
 jclass gearsObjectCls = NULL;
 jclass gearsBooleanCls = NULL;
+jclass gearsByteArrayCls = NULL;
 jclass gearsStringCls = NULL;
 jclass gearsClassCls = NULL;
 jmethodID gearsClassGetNameMethodId = NULL;
@@ -275,6 +283,7 @@ jfieldID keysReaderNoscanField = NULL;
 jfieldID keysReaderReadValuesField = NULL;
 jfieldID keysReaderEventTypesField = NULL;
 jfieldID keysReaderKeyTypesField = NULL;
+jfieldID keysReaderCommandsField = NULL;
 
 jclass gearsKeyReaderRecordCls = NULL;
 jmethodID gearsKeyReaderRecordCtrMethodId = NULL;
@@ -413,6 +422,31 @@ JNINativeMethod gearsBuilderNativeMethod[] = {
             .name = "callNextArray",
             .signature = "([Ljava/lang/String;)Ljava/lang/Object;",
             .fnPtr = JVM_GBCallNext,
+        },
+        {
+            .name = "getCommand",
+            .signature = "()[[B",
+            .fnPtr = JVM_GBGetCommand,
+        },
+        {
+            .name = "overrideReply",
+            .signature = "(Ljava/lang/Object;)V",
+            .fnPtr = JVM_GBOverriderReply,
+        },
+        {
+            .name = "setAvoidNotifications",
+            .signature = "(Z)Z",
+            .fnPtr = JVM_GBSetAvoidNotifications,
+        },
+        {
+            .name = "acquireRedisGil",
+            .signature = "()V",
+            .fnPtr = JVM_GBAcquireRedisGil,
+        },
+        {
+            .name = "releaseRedisGil",
+            .signature = "()V",
+            .fnPtr = JVM_GBReleaseRedisGil,
         },
         {
             .name = "log",
@@ -945,6 +979,8 @@ static JVM_ThreadLocalData* JVM_GetThreadLocalData(JVM_ExecutionCtx* jectx){
 
             JVM_TryFindClass(jvm_tld->env, "java/lang/Boolean", gearsBooleanCls);
 
+            JVM_TryFindClass(jvm_tld->env, "[B", gearsByteArrayCls);
+
             JVM_TryFindClass(jvm_tld->env, "java/lang/String", gearsStringCls);
 
             JVM_TryFindClass(jvm_tld->env, "java/lang/Class", gearsClassCls);
@@ -1058,6 +1094,7 @@ static JVM_ThreadLocalData* JVM_GetThreadLocalData(JVM_ExecutionCtx* jectx){
             JVM_TryFindField(jvm_tld->env, gearsKeyReaderCls, "readValues", "Z", keysReaderReadValuesField);
             JVM_TryFindField(jvm_tld->env, gearsKeyReaderCls, "eventTypes", "[Ljava/lang/String;", keysReaderEventTypesField);
             JVM_TryFindField(jvm_tld->env, gearsKeyReaderCls, "keyTypes", "[Ljava/lang/String;", keysReaderKeyTypesField);
+            JVM_TryFindField(jvm_tld->env, gearsKeyReaderCls, "commands", "[Ljava/lang/String;", keysReaderCommandsField);
 
             JVM_TryFindClass(jvm_tld->env, "gears/records/KeysReaderRecord", gearsKeyReaderRecordCls);
             JVM_TryFindMethod(jvm_tld->env, gearsKeyReaderRecordCls, "<init>", "(Ljava/lang/String;Ljava/lang/String;ZLjava/nio/ByteBuffer;)V", gearsKeyReaderRecordCtrMethodId);
@@ -1838,7 +1875,10 @@ static Record* JVM_KeyReaderReadRecord(RedisModuleCtx* rctx, RedisModuleString* 
     if(readValue){
         RedisModuleKey* tmpPtr = keyPtr;
         if(!tmpPtr){
+            // we do not want key missed to jump here accidently
+            int oldAvoidEvents = RedisGears_KeysReaderSetAvoidEvents(1);
             tmpPtr = RedisModule_OpenKey(rctx, key, REDISMODULE_READ);
+            RedisGears_KeysReaderSetAvoidEvents(oldAvoidEvents);
         }
         serializedValue = JVM_GetSerializedVal(rctx, env, tmpPtr, key, recordBuff);
         if(!keyPtr){
@@ -2089,7 +2129,26 @@ void* JVM_CreateRegisterKeysReaderArgs(JNIEnv *env, FlatExecutionPlan* fep, jobj
         }
     }
 
+    jobject jcommands = (*env)->GetObjectField(env, reader, keysReaderCommandsField);
+    char** commands = NULL;
+    if(jcommands){
+        jsize jcommandsLen = (*env)->GetArrayLength(env, jcommands);
+        if(jcommandsLen > 0){
+            commands = array_new(char*, jcommandsLen);
+            for(size_t i = 0 ; i < jcommandsLen ; ++i){
+                jobject jcommand = (*env)->GetObjectArrayElement(env, jcommands, i);
+                const char* jcommandStr = (*env)->GetStringUTFChars(env, jcommand, NULL);
+                commands = array_append(commands, JVM_STRDUP(jcommandStr));
+                (*env)->ReleaseStringUTFChars(env, jcommand, jcommandStr);
+            }
+        }
+    }
+
     KeysReaderTriggerArgs* triggerArgsCtx = RedisGears_KeysReaderTriggerArgsCreate(patternStr, eventTypes, keyTypes, readValues);
+
+    if(commands){
+        RedisGears_KeysReaderTriggerArgsSetHookCommands(triggerArgsCtx, commands);
+    }
 
     RGM_KeysReaderTriggerArgsSetReadRecordCallback(triggerArgsCtx, JVM_KeyReaderReadRecord);
 
@@ -2245,6 +2304,92 @@ static void JVM_GBLog(JNIEnv *env, jobject objectOrClass, jstring msg, jobject l
     RedisModule_Log(NULL, logLevelStr, "JAVA_GEARS: %s", msgStr);
 
     (*env)->ReleaseStringUTFChars(env, msg, msgStr);
+}
+
+static void JVM_GBAcquireRedisGil(JNIEnv *env, jobject objectOrClass){
+    RedisGears_LockHanlderAcquire(staticCtx);
+}
+
+static void JVM_GBReleaseRedisGil(JNIEnv *env, jobject objectOrClass){
+    RedisGears_LockHanlderRelease(staticCtx);
+}
+
+static jboolean JVM_GBSetAvoidNotifications(JNIEnv *env, jobject objectOrClass, jboolean val){
+    if(RedisGears_KeysReaderSetAvoidEvents(val ? 1 : 0)){
+        return JNI_TRUE;
+    }
+    return JNI_FALSE;
+}
+
+static void JVM_GBOverriderReply(JNIEnv *env, jobject objectOrClass, jobject reply){
+    if(!reply){
+        (*env)->ThrowNew(env, exceptionCls, "Can not override with NULL values");
+        return;
+    }
+
+    JVM_ThreadLocalData* jvm_tld = JVM_GetThreadLocalData(NULL);
+    if(!jvm_tld->eCtx){
+        (*env)->ThrowNew(env, exceptionCls, "Can no call next without execution ctx");
+        return;
+    }
+
+    CommandCtx* cmdCtx = RedisGears_CommandCtxGet(jvm_tld->eCtx);
+    if(!cmdCtx){
+        (*env)->ThrowNew(env, exceptionCls, "Can no get command ctx");
+        return;
+    }
+
+    JVMRecord* r = (JVMRecord*)RedisGears_RecordCreate(JVMRecordType);
+    if(reply){
+        r->obj = JVM_TurnToGlobal(jvm_tld->env, reply);
+    }else{
+        r->obj = NULL;
+    }
+
+    char* err = NULL;
+    if(RedisGears_CommandCtxOverrideReply(cmdCtx, &r->baseRecord, &err) != REDISMODULE_OK){
+        RedisGears_FreeRecord(&r->baseRecord);
+        (*env)->ThrowNew(env, exceptionCls, err);
+        JVM_FREE(err);
+        return;
+    }
+}
+
+static jobject JVM_GBGetCommand(JNIEnv *env, jobject objectOrClass){
+    JVM_ThreadLocalData* jvm_tld = JVM_GetThreadLocalData(NULL);
+    if(!jvm_tld->eCtx){
+        (*env)->ThrowNew(env, exceptionCls, "Can no call next without execution ctx");
+        return NULL;
+    }
+
+    CommandCtx* cmdCtx = RedisGears_CommandCtxGet(jvm_tld->eCtx);
+    if(!cmdCtx){
+        (*env)->ThrowNew(env, exceptionCls, "Can no get command ctx");
+        return NULL;
+    }
+
+    // we must take the lock, it is not safe to access the command args without the lock because redis might
+    // change them under our noise
+    RedisGears_LockHanlderAcquire(staticCtx);
+
+    size_t len;
+    RedisModuleString** command = RedisGears_CommandCtxGetCommand(cmdCtx, &len);
+
+    jobjectArray res = (*env)->NewObjectArray(env, len, gearsByteArrayCls, NULL);
+
+    for(size_t i = 0 ; i < len ; ++i){
+        size_t argLen;
+        const char* arg = RedisModule_StringPtrLen(command[i], &argLen);
+        jbyteArray jarg = (*env)->NewByteArray(env, argLen);
+
+        (*env)->SetByteArrayRegion(env, jarg, 0, argLen, arg);
+
+        (*env)->SetObjectArrayElement(env, res, i, jarg);
+    }
+
+    RedisGears_LockHanlderRelease(staticCtx);
+
+    return res;
 }
 
 static jobject JVM_GBCallNext(JNIEnv *env, jobject objectOrClass, jobjectArray args){
@@ -2636,6 +2781,11 @@ int JVM_Run(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
 error:
     // clean the thread ctx class loader just in case
     (*env)->CallStaticVoidMethod(env, gearsBuilderCls, gearsCleanCtxClassLoaderMethodId);
+
+    char* internalErr = NULL;
+    if((internalErr = JVM_GetException(env))){
+        RedisModule_Log(NULL, "warning", "Failed cleaning thread ctx class loader, error='%s'", internalErr);
+    }
 
     RedisModule_ReplyWithError(ctx, err);
     JVM_FREE(err);
@@ -3108,6 +3258,12 @@ static int JVMRecord_SendReply(Record* base, RedisModuleCtx* rctx){
     JVM_PushFrame(env);
 
     char* err = NULL;
+    if(!r->obj){
+        RedisModule_ReplyWithNull(rctx);
+        JVM_PopFrame(env);
+        return REDISMODULE_OK;
+    }
+
     if((*env)->IsInstanceOf(env, r->obj, gearsLongCls)){
         jlong res = (*env)->CallLongMethod(env, r->obj, gearsLongValMethodId);
         if((err = JVM_GetException(env))){
@@ -3168,10 +3324,21 @@ static int JVMRecord_SendReply(Record* base, RedisModuleCtx* rctx){
     jobject res = (*env)->CallStaticObjectMethod(env, gearsBuilderCls, recordToStr, r->obj);
     if((err = JVM_GetException(env))){
         RedisModule_Log(NULL, "warning", "Excpetion raised but not catched, exception='%s'", err);
-        RedisModule_ReplyWithCString(rctx, err);
+        RedisModule_ReplyWithError(rctx, err);
     }else{
         const char* resStr = (*env)->GetStringUTFChars(env, res, NULL);
-        RedisModule_ReplyWithCString(rctx, resStr);
+        size_t len = strlen(resStr);
+        if(len > 1){
+            if(resStr[0] == '-'){
+                RedisModule_ReplyWithError(rctx, resStr + 1);
+            } else if(resStr[0] == '+'){
+                RedisModule_ReplyWithSimpleString(rctx, resStr + 1);
+            } else {
+                RedisModule_ReplyWithStringBuffer(rctx, resStr, len);
+            }
+        }else{
+            RedisModule_ReplyWithStringBuffer(rctx, resStr, len);
+        }
         (*jvm_tld->env)->ReleaseStringUTFChars(jvm_tld->env, res, resStr);
         (*jvm_tld->env)->DeleteLocalRef(jvm_tld->env, res);
     }
@@ -3578,6 +3745,12 @@ int RedisGears_OnLoad(RedisModuleCtx *ctx) {
     if(RedisGears_InitAsGearPlugin(ctx, REDISGEARSJVM_PLUGIN_NAME, REDISGEARSJVM_PLUGIN_VERSION) != REDISMODULE_OK){
         RedisModule_Log(ctx, "warning", "Failed initialize RedisGears API");
         return REDISMODULE_ERR;
+    }
+
+    if(RMAPI_FUNC_SUPPORTED(RedisModule_GetDetachedThreadSafeContext)){
+        staticCtx = RedisModule_GetDetachedThreadSafeContext(ctx);
+    }else{
+        staticCtx = RedisModule_GetThreadSafeContext(NULL);
     }
 
     recordBuff = RedisGears_BufferCreate(100);
