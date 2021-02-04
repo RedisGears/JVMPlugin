@@ -2848,7 +2848,7 @@ static jobject JVM_ToJavaRecordMapperInternal(JNIEnv *env, ExecutionCtx* rctx, R
         }
     }else if(RedisGears_RecordGetType(data) == JVMRecordType){
         JVMRecord* jvmVal = (JVMRecord*)data;
-        obj = jvmVal->obj;
+        obj = (*env)->NewLocalRef(env, jvmVal->obj);
     }else if(RedisGears_RecordGetType(data) == RedisGears_GetListRecordType()){
         obj = (*env)->NewObjectArray(env, RedisGears_ListRecordLen(data), gearsObjectCls, NULL);
         for(size_t i = 0 ; i < RedisGears_ListRecordLen(data) ; ++i){
