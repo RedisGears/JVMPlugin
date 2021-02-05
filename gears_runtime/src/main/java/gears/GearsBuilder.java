@@ -6,14 +6,11 @@ import java.io.Serializable;
 import java.io.StringWriter;
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 
 import javax.management.MBeanServer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.redislabs.Connector;
-import com.redislabs.WriteSource;
 import com.sun.management.HotSpotDiagnosticMXBean;
 
 import gears.operations.AccumulateByOperation;
@@ -25,7 +22,6 @@ import gears.operations.ExtractorOperation;
 import gears.operations.FilterOperation;
 import gears.operations.FlatMapOperation;
 import gears.operations.ForeachOperation;
-import gears.operations.GearsFutureOnDone;
 import gears.operations.MapOperation;
 import gears.operations.OnRegisteredOperation;
 import gears.operations.OnUnregisteredOperation;
