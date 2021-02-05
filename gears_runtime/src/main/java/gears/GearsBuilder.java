@@ -5,10 +5,15 @@ import java.io.PrintWriter;
 import java.io.Serializable;
 import java.io.StringWriter;
 import java.lang.management.ManagementFactory;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
 
 import javax.management.MBeanServer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.redislabs.Connector;
+import com.redislabs.WriteSource;
 import com.sun.management.HotSpotDiagnosticMXBean;
 
 import gears.operations.AccumulateByOperation;
@@ -706,10 +711,28 @@ public class GearsBuilder<T extends Serializable>{
 	}
 	
 	/**
-	 * Internal use, force runnint GC.
+	 * Internal use, force running GC.
 	 * @throws IOException
 	 */
 	private static void runGC() {
 		System.gc();		
+	}
+	
+	/**
+	 * Internal use, information about the JVM.
+	 * @throws IOException
+	 */
+	private static Object getStats() {
+		
+		List<Serializable> res = new ArrayList<>();
+        Runtime runtime = Runtime.getRuntime();
+        String memory = Long.toString(runtime.totalMemory());
+        String freeMemory = Long.toString(runtime.freeMemory());
+        res.add("TotalMemory");
+        res.add(memory);
+        res.add("FreeMemory");
+        res.add(freeMemory);
+        
+        return res;		
 	}
 }

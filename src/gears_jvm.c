@@ -57,6 +57,7 @@ static void JVM_ThreadPoolWorkerHelper(JNIEnv *env, jobject objectOrClass, jlong
 static void JVM_ClassLoaderFinalized(JNIEnv *env, jobject objectOrClass, jlong ctx);
 static jstring JVM_GetSessionUpgradeData(JNIEnv *env, jobject objectOrClass, jstring sessionId);
 static JVMFlatExecutionSession* JVM_FepSessionCreate(JNIEnv *env, JVMRunSession* s, char** err);
+static int JVMRecord_SendReply(Record* base, RedisModuleCtx* rctx);
 
 static RedisModuleCtx *staticCtx = NULL;
 
@@ -220,6 +221,7 @@ jmethodID gearsGetStackTraceMethodId = NULL;
 jmethodID gearsCleanCtxClassLoaderMethodId = NULL;
 jmethodID gearsDumpHeapMethodId = NULL;
 jmethodID gearsRunGCMethodId = NULL;
+jmethodID gearsGetStatsMethodId = NULL;
 
 jclass gearsObjectInputStreamCls = NULL;
 jmethodID gearsObjectInputStreamGetMethodId = NULL;
@@ -1040,6 +1042,7 @@ static JVM_ThreadLocalData* JVM_GetThreadLocalData(JVM_ExecutionCtx* jectx){
             JVM_TryFindStaticMethod(jvm_tld->env, gearsBuilderCls, "cleanCtxClassLoader", "()V", gearsCleanCtxClassLoaderMethodId);
             JVM_TryFindStaticMethod(jvm_tld->env, gearsBuilderCls, "dumpHeap", "(Ljava/lang/String;Ljava/lang/String;)V", gearsDumpHeapMethodId);
             JVM_TryFindStaticMethod(jvm_tld->env, gearsBuilderCls, "runGC", "()V", gearsRunGCMethodId);
+            JVM_TryFindStaticMethod(jvm_tld->env, gearsBuilderCls, "getStats", "()Ljava/lang/Object;", gearsGetStatsMethodId);
 
             JVM_TryFindClass(jvm_tld->env, "gears/operations/MapOperation", gearsMappCls);
             JVM_TryFindMethod(jvm_tld->env, gearsMappCls, "map", "(Ljava/io/Serializable;)Ljava/io/Serializable;", gearsMapMethodId);
@@ -2592,7 +2595,38 @@ static jstring JVM_GBRegister(JNIEnv *env, jobject objectOrClass, jobject reader
     return regId;
 }
 
-int JVM_DumpHeap(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
+static int JVM_JVMStats(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
+    if(argc != 1){
+        return RedisModule_WrongArity(ctx);
+    }
+
+    JVM_ThreadLocalData* jvm_ltd= JVM_GetThreadLocalData(NULL);
+    JNIEnv *env = jvm_ltd->env;
+
+    JVM_PushFrame(env);
+
+    jobject obj = (*env)->CallStaticObjectMethod(env, gearsBuilderCls, gearsGetStatsMethodId);
+
+    char* err = NULL;
+    if((err = JVM_GetException(env))){
+        RedisModule_Log(NULL, "warning", "Failed getting jvm stats, error='%s'", err);
+        RedisModule_ReplyWithError(ctx, err);
+    }else{
+        JVMRecord* r = (JVMRecord*)RedisGears_RecordCreate(JVMRecordType);
+        if(obj){
+            r->obj = JVM_TurnToGlobal(env, obj);
+        }else{
+            r->obj = NULL;
+        }
+        JVMRecord_SendReply(&r->baseRecord, ctx);
+        RedisGears_FreeRecord(&r->baseRecord);
+    }
+
+    JVM_PopFrame(env);
+    return REDISMODULE_OK;
+}
+
+static int JVM_DumpHeap(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
     if(argc != 2){
         return RedisModule_WrongArity(ctx);
     }
@@ -2621,7 +2655,7 @@ int JVM_DumpHeap(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
     return REDISMODULE_OK;
 }
 
-int JVM_RunGC(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
+static int JVM_RunGC(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
     if(argc != 1){
         return RedisModule_WrongArity(ctx);
     }
@@ -2646,7 +2680,7 @@ int JVM_RunGC(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
     return REDISMODULE_OK;
 }
 
-int JVM_DumpSessions(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
+static int JVM_DumpSessions(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
     if(argc != 1){
         return RedisModule_WrongArity(ctx);
     }
@@ -2677,7 +2711,7 @@ int JVM_DumpSessions(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
     return REDISMODULE_OK;
 }
 
-int JVM_Run(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
+static int JVM_Run(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
     if(argc < 3){
         return RedisModule_WrongArity(ctx);
     }
@@ -3849,6 +3883,11 @@ int RedisGears_OnLoad(RedisModuleCtx *ctx) {
 
     if (RedisModule_CreateCommand(ctx, "rg.jdumpheap", JVM_DumpHeap, "readonly", 0, 0, 0) != REDISMODULE_OK) {
         RedisModule_Log(ctx, "warning", "could not register command rg.jdumpheap");
+        return REDISMODULE_ERR;
+    }
+
+    if (RedisModule_CreateCommand(ctx, "rg.jstats", JVM_JVMStats, "readonly", 0, 0, 0) != REDISMODULE_OK) {
+        RedisModule_Log(ctx, "warning", "could not register command rg.jstats");
         return REDISMODULE_ERR;
     }
 
