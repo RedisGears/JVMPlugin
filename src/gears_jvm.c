@@ -33,6 +33,7 @@ static jobject JVM_GBExecute(JNIEnv *env, jobject objectOrClass, jobjectArray co
 static jobject JVM_GBCallNext(JNIEnv *env, jobject objectOrClass, jobjectArray command);
 static jobject JVM_GBGetCommand(JNIEnv *env, jobject objectOrClass);
 static void JVM_GBOverriderReply(JNIEnv *env, jobject objectOrClass, jobject reply);
+static jfloat JVM_GBGetMemoryRatio(JNIEnv *env, jobject objectOrClass);
 static jboolean JVM_GBSetAvoidNotifications(JNIEnv *env, jobject objectOrClass, jboolean val);
 static void JVM_GBAcquireRedisGil(JNIEnv *env, jobject objectOrClass);
 static void JVM_GBReleaseRedisGil(JNIEnv *env, jobject objectOrClass);
@@ -434,6 +435,11 @@ JNINativeMethod gearsBuilderNativeMethod[] = {
             .name = "overrideReply",
             .signature = "(Ljava/lang/Object;)V",
             .fnPtr = JVM_GBOverriderReply,
+        },
+        {
+            .name = "getMemoryRatio",
+            .signature = "()F",
+            .fnPtr = JVM_GBGetMemoryRatio,
         },
         {
             .name = "setAvoidNotifications",
@@ -2322,6 +2328,18 @@ static jboolean JVM_GBSetAvoidNotifications(JNIEnv *env, jobject objectOrClass, 
         return JNI_TRUE;
     }
     return JNI_FALSE;
+}
+
+static jfloat JVM_GBGetMemoryRatio(JNIEnv *env, jobject objectOrClass){
+    if(!RMAPI_FUNC_SUPPORTED(RedisModule_GetUsedMemoryRatio)){
+        (*env)->ThrowNew(env, exceptionCls, "getMemoryRatio is not implemented on this redis version");
+        return 0;
+    }
+    RedisGears_LockHanlderRegister();
+    RedisGears_LockHanlderAcquire(staticCtx);
+    float res = RedisModule_GetUsedMemoryRatio();
+    RedisGears_LockHanlderRelease(staticCtx);
+    return res;
 }
 
 static void JVM_GBOverriderReply(JNIEnv *env, jobject objectOrClass, jobject reply){

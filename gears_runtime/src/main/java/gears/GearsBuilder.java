@@ -402,6 +402,13 @@ public class GearsBuilder<T extends Serializable>{
 	public static native void overrideReply(Object reply);
 	
 	/**
+	 * Returns the current memory ratio as value between 0-1.
+	 * If the return value greater than 1 -> memory limit reached.
+	 * If return value equal 0 -> no memory limit
+	 */
+	public static native float getMemoryRatio();
+	
+	/**
 	 * Write a log message to the redis log file
 	 * 
 	 * @param msg - the message to write
