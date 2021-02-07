@@ -5,6 +5,8 @@ import java.io.PrintWriter;
 import java.io.Serializable;
 import java.io.StringWriter;
 import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryPoolMXBean;
+import java.lang.management.MemoryUsage;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -726,15 +728,52 @@ public class GearsBuilder<T extends Serializable>{
 	 * @throws IOException
 	 */
 	private static Object getStats() {
+		long totalAllocatedMemory = 0;
 		
-		List<Serializable> res = new ArrayList<>();
+		List<Object> res = new ArrayList<>();
         Runtime runtime = Runtime.getRuntime();
-        String memory = Long.toString(runtime.totalMemory());
-        String freeMemory = Long.toString(runtime.freeMemory());
-        res.add("TotalMemory");
-        res.add(memory);
-        res.add("FreeMemory");
-        res.add(freeMemory);
+        res.add("runtimeReport");
+        List<Object> runtimeReport = new ArrayList<>();
+        runtimeReport.add("heapTotalMemory");
+        runtimeReport.add(runtime.totalMemory());
+        runtimeReport.add("heapFreeMemory");
+        runtimeReport.add(runtime.freeMemory());
+        runtimeReport.add("heapMaxMemory");
+        runtimeReport.add(runtime.maxMemory());
+        res.add(runtimeReport);
+        
+        res.add("memoryMXBeanReport");
+        MemoryUsage heapMemory = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
+        MemoryUsage nonHeapMemory = ManagementFactory.getMemoryMXBean().getNonHeapMemoryUsage();
+        List<Object> memoryMXBeanReport = new ArrayList<>();
+        memoryMXBeanReport.add("heapMemory");
+        memoryMXBeanReport.add(heapMemory);
+        memoryMXBeanReport.add("nonHeapMemory");
+        memoryMXBeanReport.add(nonHeapMemory);
+        res.add(memoryMXBeanReport);
+        
+        totalAllocatedMemory += (heapMemory.getUsed() > heapMemory.getInit()) ? heapMemory.getUsed() : heapMemory.getInit();
+        totalAllocatedMemory += (nonHeapMemory.getUsed() > nonHeapMemory.getInit()) ? nonHeapMemory.getUsed() : nonHeapMemory.getInit();
+        
+        res.add("pools");
+        List<Object> pools = new ArrayList<>();
+        
+        List<MemoryPoolMXBean> memPool = ManagementFactory.getMemoryPoolMXBeans();
+        for (MemoryPoolMXBean p : memPool)
+        {
+        	MemoryUsage usage = p.getUsage();
+        	pools.add(p.getName());
+        	pools.add(usage);
+        	totalAllocatedMemory += (usage.getUsed() > usage.getInit()) ? usage.getUsed() : usage.getInit();
+        }
+        
+        res.add(pools);
+        
+        res.add("totalAllocatedMemory");
+        res.add(totalAllocatedMemory);
+        
+        res.add("totalAllocatedMemoryHuman");
+        res.add((totalAllocatedMemory / (1024.0 * 1024.0)) + "mb");
         
         return res;		
 	}
