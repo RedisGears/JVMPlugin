@@ -158,6 +158,7 @@ typedef struct JVMRunSession{
     char* mainClassName;
     uint version;
     jobject sessionClsLoader;
+    JVM_listNode* tsNode;
 }JVMRunSession;
 
 typedef struct JVMFlatExecutionSession{
@@ -188,6 +189,7 @@ typedef struct JVM_ThreadLocalData{
 
 pthread_mutex_t JVMSessionsLock;
 RedisModuleDict* JVMSessions = NULL;
+JVM_list* JVMTSSessions = NULL;
 
 pthread_key_t threadLocalData;
 
@@ -495,9 +497,13 @@ static void JVM_SessionAdd(JVMRunSession* s){
     pthread_mutex_unlock(&JVMSessionsLock);
 }
 
-static void JVM_SessionDel(const char* uuid){
+static void JVM_SessionDel(JVMRunSession* s){
     pthread_mutex_lock(&JVMSessionsLock);
-    RedisModule_DictDelC(JVMSessions, (char*)uuid, ID_LEN, NULL);
+    if(s->tsNode){
+        JVM_listDelNode(JVMTSSessions, s->tsNode);
+    }else{
+        RedisModule_DictDelC(JVMSessions, (char*)s->uuid, ID_LEN, NULL);
+    }
     pthread_mutex_unlock(&JVMSessionsLock);
 }
 
@@ -531,7 +537,7 @@ static JVMRunSession* JVM_SessionGetFromStrId(const char* id){
 static void JVM_SessionFreeMemory(JVMRunSession* s){
     RedisModule_Assert(!s->sessionClsLoader);
     RedisModule_Assert(s->refCount == 0);
-    JVM_SessionDel(s->uuid);
+    JVM_SessionDel(s);
     int ret = RedisGears_ExecuteCommand(NULL, "verbose", "rm -rf %s", s->jarFilePath);
     if(ret != 0){
         RedisModule_Log(NULL, "warning", "Failed deleting session jar %s", s->jarFilePath);
@@ -737,7 +743,14 @@ static JVMRunSession* JVM_SessionCreate(const char* id, const char* mainClassNam
 
     s->sessionClsLoader = NULL;
 
-    JVM_asprintf(&s->jarFilePath, "%s/%s-jars/%s.jar", workingDir, shardUniqueId, s->uuidStr);
+    s->tsNode = NULL;
+
+#define JAR_RANDOM_NAME 40
+    char randomName[JAR_RANDOM_NAME + 1];
+    RedisModule_GetRandomHexChars(randomName, JAR_RANDOM_NAME);
+    randomName[JAR_RANDOM_NAME] = '\0';
+
+    JVM_asprintf(&s->jarFilePath, "%s/%s-jars/%s.jar", workingDir, shardUniqueId, randomName);
 
     FILE *f = fopen(s->jarFilePath, "wb");
     if(!f){
@@ -2709,8 +2722,27 @@ static int JVM_DumpSessions(RedisModuleCtx *ctx, RedisModuleString **argv, int a
     char* key;
     size_t keyLen;
     JVMRunSession* s;
+    RedisModule_ReplyWithArray(ctx, 4);
+    RedisModule_ReplyWithCString(ctx, "active");
     RedisModule_ReplyWithArray(ctx, RedisModule_DictSize(JVMSessions));
     while((key = RedisModule_DictNextC(iter, &keyLen, (void**)&s))){
+        RedisModule_ReplyWithArray(ctx, 10);
+        RedisModule_ReplyWithCString(ctx, "id");
+        RedisModule_ReplyWithCString(ctx, s->uuidStr);
+        RedisModule_ReplyWithCString(ctx, "mainClassName");
+        RedisModule_ReplyWithCString(ctx, s->mainClassName);
+        RedisModule_ReplyWithCString(ctx, "version");
+        RedisModule_ReplyWithLongLong(ctx, s->version);
+        RedisModule_ReplyWithCString(ctx, "jar");
+        RedisModule_ReplyWithCString(ctx, s->jarFilePath);
+        RedisModule_ReplyWithCString(ctx, "refCount");
+        RedisModule_ReplyWithLongLong(ctx, s->refCount);
+    }
+
+    RedisModule_ReplyWithCString(ctx, "ts");
+    RedisModule_ReplyWithArray(ctx, JVM_listLength(JVMTSSessions));
+    for(JVM_listNode* curr = JVM_listFirst(JVMTSSessions) ; curr != NULL ; curr = JVM_listNextNode(curr)){
+        s = JVM_listNodeValue(curr);
         RedisModule_ReplyWithArray(ctx, 10);
         RedisModule_ReplyWithCString(ctx, "id");
         RedisModule_ReplyWithCString(ctx, s->uuidStr);
@@ -3793,6 +3825,31 @@ RedisGears_ReaderCallbacks JavaReader = {
         .create = JVM_CreateReader,
 };
 
+static void JVM_OnLoadedEvent(RedisModuleCtx *ctx, RedisModuleEvent eid, uint64_t subevent, void *data){
+    if(subevent == REDISMODULE_SUBEVENT_LOADING_RDB_START ||
+            subevent == REDISMODULE_SUBEVENT_LOADING_AOF_START ||
+            subevent == REDISMODULE_SUBEVENT_LOADING_REPL_START){
+        // we will create a new empty session dictionary, when we start loading we want a fresh
+        // start. Otherwise old sessions might mixed with new loaded session.
+        pthread_mutex_lock(&JVMSessionsLock);
+        RedisModuleDictIter *iter = RedisModule_DictIteratorStartC(JVMSessions, "^", NULL, 0);
+
+        char *key;
+        size_t keyLen;
+        JVMRunSession* session;
+        while((key = RedisModule_DictNextC(iter,&keyLen,(void**)&session))) {
+            JVM_listAddNodeHead(JVMTSSessions, session);
+            session->tsNode = JVM_listFirst(JVMTSSessions);
+        }
+
+        RedisModule_FreeDict(ctx, JVMSessions);
+
+        JVMSessions = RedisModule_CreateDict(ctx);
+
+        pthread_mutex_unlock(&JVMSessionsLock);
+    }
+}
+
 int RedisGears_OnLoad(RedisModuleCtx *ctx) {
     if(RedisGears_InitAsGearPlugin(ctx, REDISGEARSJVM_PLUGIN_NAME, REDISGEARSJVM_PLUGIN_VERSION) != REDISMODULE_OK){
         RedisModule_Log(ctx, "warning", "Failed initialize RedisGears API");
@@ -3804,6 +3861,8 @@ int RedisGears_OnLoad(RedisModuleCtx *ctx) {
     }else{
         staticCtx = RedisModule_GetThreadSafeContext(NULL);
     }
+
+    RedisGears_RegisterLoadingEvent(JVM_OnLoadedEvent);
 
     recordBuff = RedisGears_BufferCreate(100);
     int err = pthread_key_create(&threadLocalData, NULL);
@@ -3820,6 +3879,7 @@ int RedisGears_OnLoad(RedisModuleCtx *ctx) {
 
     pthread_mutex_init(&JVMSessionsLock, NULL);
     JVMSessions = RedisModule_CreateDict(ctx);
+    JVMTSSessions = JVM_listCreate();
 
     JVMRecordType = RedisGears_RecordTypeCreate("JVMRecord",
                                                 sizeof(JVMRecord),
