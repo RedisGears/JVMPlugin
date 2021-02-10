@@ -6,6 +6,6 @@ import gears.GearsFuture;
 
 public interface AsyncForeachOperation<I extends Serializable> extends Serializable {
 
-	public GearsFuture<I> foreach(I record) throws Exception;
+	public GearsFuture<Serializable> foreach(I record) throws Exception;
 
 }
