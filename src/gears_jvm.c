@@ -2374,11 +2374,7 @@ static void JVM_GBOverriderReply(JNIEnv *env, jobject objectOrClass, jobject rep
     }
 
     JVMRecord* r = (JVMRecord*)RedisGears_RecordCreate(JVMRecordType);
-    if(reply){
-        r->obj = JVM_TurnToGlobal(jvm_tld->env, reply);
-    }else{
-        r->obj = NULL;
-    }
+    r->obj = JVM_TurnToGlobal(jvm_tld->env, reply);
 
     char* err = NULL;
     if(RedisGears_CommandCtxOverrideReply(cmdCtx, &r->baseRecord, &err) != REDISMODULE_OK){
@@ -3841,6 +3837,8 @@ static void JVM_OnLoadedEvent(RedisModuleCtx *ctx, RedisModuleEvent eid, uint64_
             JVM_listAddNodeHead(JVMTSSessions, session);
             session->tsNode = JVM_listFirst(JVMTSSessions);
         }
+
+        RedisModule_DictIteratorStop(iter);
 
         RedisModule_FreeDict(ctx, JVMSessions);
 
