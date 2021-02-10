@@ -162,6 +162,7 @@ def jvmTestDecorator(preExecute=None, postExecution=None, envArgs={}):
                     verifyRegistrationIntegrity(env)
                 except Exception as e:
                     executionError = str(e)
+                    print(Colors.Gray('\tExceptionError (not test failure): %s' % executionError))
             if res == 'OK':
                 results = 'OK'
                 errs = []
