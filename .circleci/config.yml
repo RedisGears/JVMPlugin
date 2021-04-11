@@ -8,8 +8,6 @@ commands:
           command: |
             git submodule update --init --recursive
             ./deps/readies/bin/getpy3
-            ./deps/readies/bin/getpy2
-            python3 ./deps/readies/bin/system-setup.py
 
 jobs:
   build-and-test-bionic:
@@ -20,15 +18,15 @@ jobs:
             name: Setup executor
             command: |
               apt-get -qq update
-              apt-get -q install -y git openssh-client curl ca-certificates make tar gzip python3-dev unzip python-pip maven
+              apt-get -q install -y git openssh-client curl ca-certificates make tar gzip unzip maven
         - checkout
         - setup-automation
         - run:
             name: Install Redis
-            command: ./deps/readies/bin/getredis --version 6
+            command: python3 ./deps/readies/bin/getredis --version 6
         - run:
             name: Install RLTest
-            command: python2.7 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
+            command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
         - run:
             name: Tests
             command: make tests
@@ -39,41 +37,29 @@ jobs:
             root: artifacts
             paths:
               - 'snapshot/*.tgz'
+              - 'release/*.tgz'
   build-and-test-centos:
       docker:
-        - image: 'centos:centos7'
+        - image: centos:7.8.2003
       steps:
         - run:
             name: Setup executor
             command: |
-              yum install -y git openssh-client curl ca-certificates make tar gzip python-devel python3-devel.x86_64 unzip maven
-        - run:
-            name: Install centos-release-scl
-            command: |
-              yum install -y centos-release-scl
-        - run:
-            name: Install gcc 8
-            command: |
-              yum install -y devtoolset-8
+              yum install -y git openssh-client curl ca-certificates make tar gzip unzip maven
         - checkout
         - setup-automation
         - run:
-            name: Install semantic_version
-            command: python3 -m pip install --no-cache-dir semantic_version
+            name: Install gcc
+            command: ./deps/readies/bin/getgcc --modern
         - run:
             name: Install Redis
-            command: . /opt/rh/devtoolset-8/enable; ./deps/readies/bin/getredis --version 6
-        - run:
-            name: get pip
-            command: |
-              curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
-              python get-pip.py
+            command: . /etc/profile.d/scl-devtoolset-9.sh; python3 ./deps/readies/bin/getredis --version 6
         - run:
             name: Install RLTest
-            command: python2.7 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
+            command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
         - run:
             name: Tests
-            command: . /opt/rh/devtoolset-8/enable; make tests
+            command: make tests
         - run:
             name: Pack
             command: make pack
@@ -81,6 +67,7 @@ jobs:
             root: artifacts
             paths:
               - 'snapshot/*.tgz'
+              - 'release/*.tgz'
   build-docker:
       docker:
         - image: 'ubuntu:bionic'
@@ -116,6 +103,18 @@ jobs:
               for f in artifacts/snapshot/*.tgz; do
                 aws s3 cp $f s3://redismodules/redisgears_plugins/jvm_plugin/snapshots/ --acl public-read
               done
+  deploy_release:
+      docker:
+        - image: redisfab/rmbuilder:6.0.9-x64-buster
+      steps:
+        - attach_workspace:
+            at: artifacts
+        - run:
+            name: Deploy Snapshots to S3
+            command: |
+              for f in artifacts/release/*.tgz; do
+                aws s3 cp $f s3://redismodules/redisgears_plugins/jvm_plugin/ --acl public-read
+              done
 on-any-branch: &on-any-branch
   filters:
     branches:
@@ -127,6 +126,13 @@ on-master: &on-master
   filters:
     branches:
       only: master
+
+on-version-tags: &on-version-tags
+  filters:
+    branches:
+      ignore: /.*/
+    tags:
+      only: /^v[0-9].*/
 
 after-build-and-test: &after-build-and-test
   requires:
@@ -142,10 +148,16 @@ workflows:
       - build-and-test-centos:
           <<: *on-any-branch
       - build-docker:
+          context: common
           <<: *on-master
       - deploy_snapshots:
+          context: common
           <<: *after-build-and-test
           <<: *on-master
+      - deploy_release:
+          context: common
+          <<: *after-build-and-test
+          <<: *on-version-tags
 
   nightly:
       triggers:

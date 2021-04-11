@@ -5,6 +5,10 @@ import java.io.PrintWriter;
 import java.io.Serializable;
 import java.io.StringWriter;
 import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryPoolMXBean;
+import java.lang.management.MemoryUsage;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.management.MBeanServer;
 
@@ -20,7 +24,6 @@ import gears.operations.ExtractorOperation;
 import gears.operations.FilterOperation;
 import gears.operations.FlatMapOperation;
 import gears.operations.ForeachOperation;
-import gears.operations.GearsFutureOnDone;
 import gears.operations.MapOperation;
 import gears.operations.OnRegisteredOperation;
 import gears.operations.OnUnregisteredOperation;
@@ -136,11 +139,11 @@ public class GearsBuilder<T extends Serializable>{
 	
 	public GearsBuilder<T> asyncForeach(AsyncForeachOperation<T> foreach){
 		this.foreach(r->{				
-			GearsFuture<T> f = foreach.foreach(r);
+			GearsFuture<Serializable> f = foreach.foreach(r);
 			if(f == null) {
 				throw new Exception("null future returned");
 			}
-			new FutureRecord<T>(f);
+			new FutureRecord<Serializable>(f);
 		});
 		
 		return this;
@@ -385,12 +388,59 @@ public class GearsBuilder<T extends Serializable>{
 	public static native Object callNextArray(String[] args);
 	
 	/**
+	 * On keys reader, if commands options was used, it is possible to get the
+	 * command associated with the notification. The command is an array of 
+	 * byte[] (just in case a blob was sent and its not a valid string).
+	 * @return - the command associated with the notification
+	 */
+	public static native byte[][] getCommand();
+	
+	/**
+	 * On keys reader, if commands options was used, it is possible to override
+	 * the reply of the command associated with the notification.
+	 * In case override the reply is not possible, an exception will be raised 
+	 * @param reply - new reply
+	 */
+	public static native void overrideReply(Object reply);
+	
+	/**
+	 * Returns the current memory ratio as value between 0-1.
+	 * If the return value greater than 1 -> memory limit reached.
+	 * If return value equal 0 -> no memory limit
+	 */
+	public static native float getMemoryRatio();
+	
+	/**
 	 * Write a log message to the redis log file
 	 * 
 	 * @param msg - the message to write
 	 * @param level - the log level
 	 */
 	public static native void log(String msg, LogLevel level);
+	
+	/**
+	 * Whether or not to avoid keys notification.
+	 * Return the old value 
+	 * Usage Example :
+	 * <pre>{@code
+	 *  	boolean oldVal = GearsBuilder.setAvoidNotifications(true);
+	 *      ...
+	 *      GearsBuilder.setAvoidNotifications(oldVal);
+	 * }</pre>
+	 * @param val - true: notifications disabled, false: notifications enabled 
+	 * @return - the old value
+	 */
+	public static native boolean setAvoidNotifications(boolean val);
+	
+	/**
+	 * acquire the Redis global lock
+	 */
+	public static native void acquireRedisGil();
+	
+	/**
+	 * release the Redis global lock
+	 */
+	public static native void releaseRedisGil();
 
 	/**
 	 * Internal use for performance increasment.
@@ -666,10 +716,65 @@ public class GearsBuilder<T extends Serializable>{
 	}
 	
 	/**
-	 * Internal use, force runnint GC.
+	 * Internal use, force running GC.
 	 * @throws IOException
 	 */
 	private static void runGC() {
 		System.gc();		
+	}
+	
+	/**
+	 * Internal use, information about the JVM.
+	 * @throws IOException
+	 */
+	private static Object getStats() {
+		long totalAllocatedMemory = 0;
+		
+		List<Object> res = new ArrayList<>();
+        Runtime runtime = Runtime.getRuntime();
+        res.add("runtimeReport");
+        List<Object> runtimeReport = new ArrayList<>();
+        runtimeReport.add("heapTotalMemory");
+        runtimeReport.add(runtime.totalMemory());
+        runtimeReport.add("heapFreeMemory");
+        runtimeReport.add(runtime.freeMemory());
+        runtimeReport.add("heapMaxMemory");
+        runtimeReport.add(runtime.maxMemory());
+        res.add(runtimeReport);
+        
+        res.add("memoryMXBeanReport");
+        MemoryUsage heapMemory = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
+        MemoryUsage nonHeapMemory = ManagementFactory.getMemoryMXBean().getNonHeapMemoryUsage();
+        List<Object> memoryMXBeanReport = new ArrayList<>();
+        memoryMXBeanReport.add("heapMemory");
+        memoryMXBeanReport.add(heapMemory);
+        memoryMXBeanReport.add("nonHeapMemory");
+        memoryMXBeanReport.add(nonHeapMemory);
+        res.add(memoryMXBeanReport);
+        
+        totalAllocatedMemory += (heapMemory.getUsed() > heapMemory.getInit()) ? heapMemory.getUsed() : heapMemory.getInit();
+        totalAllocatedMemory += (nonHeapMemory.getUsed() > nonHeapMemory.getInit()) ? nonHeapMemory.getUsed() : nonHeapMemory.getInit();
+        
+        res.add("pools");
+        List<Object> pools = new ArrayList<>();
+        
+        List<MemoryPoolMXBean> memPool = ManagementFactory.getMemoryPoolMXBeans();
+        for (MemoryPoolMXBean p : memPool)
+        {
+        	MemoryUsage usage = p.getUsage();
+        	pools.add(p.getName());
+        	pools.add(usage);
+        	totalAllocatedMemory += (usage.getUsed() > usage.getInit()) ? usage.getUsed() : usage.getInit();
+        }
+        
+        res.add(pools);
+        
+        res.add("totalAllocatedMemory");
+        res.add(totalAllocatedMemory);
+        
+        res.add("totalAllocatedMemoryHuman");
+        res.add((totalAllocatedMemory / (1024.0 * 1024.0)) + "mb");
+        
+        return res;		
 	}
 }

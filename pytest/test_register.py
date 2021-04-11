@@ -187,7 +187,7 @@ def testKeysReaderEventTypeFilter(env, conn, **kargs):
                 counter = conn.get('counter')
                 time.sleep(0.1)
     except Exception as e:
-        print e
+        print(e)
         env.assertTrue(False, message='Failed waiting for counter to reach 2')
 
     ## make sure other commands are not triggers executions
@@ -255,3 +255,50 @@ def testCommandOverride(env, results, errs, conn, **kargs):
 def testAsyncStepInSyncExecution(env, results, errs, conn, **kargs):
     env.assertEqual(len(errs), 0)
     env.expect('RG.TRIGGER', 'test').error().contains('Can not create gearsFuture on sync execution')
+
+@jvmTestDecorator()
+def testKeysReaderCommandsOption(env, results, errs, conn, **kargs):
+    env.assertEqual(len(errs), 0)
+
+    env.assertEqual(conn.execute_command('get', 'x'), ['get', 'x'])
+    env.assertEqual(conn.execute_command('get', 'y'), ['get', 'y'])
+    env.assertEqual(conn.execute_command('get', 'z'), ['get', 'z'])
+    
+@jvmTestDecorator()
+def testKeysReaderCommandsOptionReturnError(env, results, errs, conn, **kargs):
+    env.assertEqual(len(errs), 0)
+    
+    try:
+        conn.execute_command('get', 'x')
+        env.assertTrue(False, message='no error raised')
+    except Exception as e:
+        env.assertEqual(str(e), 'no such key')
+        
+@jvmTestDecorator()
+def testKeysReaderCommandsOptionBadArgsError(env, results, errs, conn, **kargs):
+    env.assertEqual(len(errs), 0)
+    
+    try:
+        conn.execute_command('RG.TRIGGER', 'bad_command')
+        env.assertTrue(False, message='no error raised')
+    except Exception as e:
+        env.assertContains('bad reply on COMMAND command', str(e))
+        
+    try:
+        conn.execute_command('RG.TRIGGER', 'unallow_command')
+        env.assertTrue(False, message='no error raised')
+    except Exception as e:
+        env.assertContains('Can not hook a command which are not allowed inside a script', str(e))
+        
+    try:
+        conn.execute_command('RG.TRIGGER', 'unknown_keys_command')
+        env.assertTrue(False, message='no error raised')
+    except Exception as e:
+        env.assertContains('Can not hook a command with moveable keys by key prefix', str(e))
+        
+    try:
+        conn.execute_command('RG.TRIGGER', 'blocking_command')
+        env.assertTrue(False, message='no error raised')
+    except Exception as e:
+        env.assertContains('Can not hook a command which are not allowed inside a script', str(e))
+    
