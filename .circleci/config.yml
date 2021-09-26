@@ -1,6 +1,6 @@
 version: 2.1
 
-commands: 
+commands:
   setup-automation:
     steps:
       - run:
@@ -77,9 +77,9 @@ jobs:
             command: |
               apt-get -qq update
               apt-get -q install -y git openssh-client curl ca-certificates
-              bash <(curl -fsSL https://get.docker.com)
+              bash <(curl -fsSL https://raw.githubusercontent.com/docker/docker-install/master/install.sh)
         - setup_remote_docker:
-            docker_layer_caching: true 
+            docker_layer_caching: true
         - checkout
         - run:
             name: Checkout submodules
@@ -93,7 +93,7 @@ jobs:
               docker push redisfab/redisgearsjvm:edge
   deploy_snapshots:
       docker:
-        - image: redisfab/rmbuilder:6.0.9-x64-buster
+        - image: redisfab/rmbuilder:6.2.5-x64-buster
       steps:
         - attach_workspace:
             at: artifacts
@@ -105,7 +105,7 @@ jobs:
               done
   deploy_release:
       docker:
-        - image: redisfab/rmbuilder:6.0.9-x64-buster
+        - image: redisfab/rmbuilder:6.2.5-x64-buster
       steps:
         - attach_workspace:
             at: artifacts
