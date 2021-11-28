@@ -2004,7 +2004,7 @@ void* JVM_CreateRegisterCommandReaderOverrideArgs(JNIEnv *env, FlatExecutionPlan
         prefixStr = (*env)->GetStringUTFChars(env, prefix, NULL);
     }
 
-    CommandReaderTriggerArgs* triggerArgs = RedisGears_CommandReaderTriggerArgsCreateHook(commandStr, prefixStr);
+    CommandReaderTriggerArgs* triggerArgs = RedisGears_CommandReaderTriggerArgsCreateHook(commandStr, prefixStr, false);
 
     (*env)->ReleaseStringUTFChars(env, command, commandStr);
 
@@ -2026,7 +2026,7 @@ void* JVM_CreateRegisterCommandReaderTriggerArgs(JNIEnv *env, FlatExecutionPlan*
 
     const char* triggerStr = (*env)->GetStringUTFChars(env, trigger, NULL);
 
-    CommandReaderTriggerArgs* triggerArgs = RedisGears_CommandReaderTriggerArgsCreate(triggerStr);
+    CommandReaderTriggerArgs* triggerArgs = RedisGears_CommandReaderTriggerArgsCreate(triggerStr, false);
 
     (*env)->ReleaseStringUTFChars(env, trigger, triggerStr);
 
@@ -3849,7 +3849,7 @@ static void JVM_OnLoadedEvent(RedisModuleCtx *ctx, RedisModuleEvent eid, uint64_
 }
 
 int RedisGears_OnLoad(RedisModuleCtx *ctx) {
-    if(RedisGears_InitAsGearPlugin(ctx, REDISGEARSJVM_PLUGIN_NAME, REDISGEARSJVM_PLUGIN_VERSION) != REDISMODULE_OK){
+    if(!RedisGears_InitAsGearPlugin(ctx, REDISGEARSJVM_PLUGIN_NAME, REDISGEARSJVM_PLUGIN_VERSION)){
         RedisModule_Log(ctx, "warning", "Failed initialize RedisGears API");
         return REDISMODULE_ERR;
     }
