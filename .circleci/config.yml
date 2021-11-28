@@ -59,7 +59,7 @@ jobs:
             command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
         - run:
             name: Tests
-            command: make tests
+            command: OS=rhel OS_VER=7 make tests
         - run:
             name: Pack
             command: make pack
