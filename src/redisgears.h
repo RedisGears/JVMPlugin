@@ -979,7 +979,7 @@ static int RedisGears_Initialize(RedisModuleCtx* ctx, const char* name, int vers
         return REDISMODULE_ERR;
     }
 
-    if(RedisGears_RegisterPlugin(name, version) != REDISMODULE_OK){
+    if(!RedisGears_RegisterPlugin(name, version)){
         return REDISMODULE_ERR;
     }
 

@@ -1,4 +1,6 @@
-OS=$(shell ./deps/readies/bin/platform --osnick)
+OS=$(shell ./deps/readies/bin/platform --dist)
+OS_VER=$(shell ./deps/readies/bin/platform --version)
+OS_NICK=$(shell ./deps/readies/bin/platform --osnick)
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 VERSION=$(shell ./getver)
 $(info OS=$(OS))
@@ -9,7 +11,7 @@ gears_jvm: InstallRedisGears InstallOpenJDK GearsRuntime
 	make -C ./src/
 	
 InstallRedisGears:
-	OS=$(OS) /bin/bash ./Install_RedisGears.sh
+	OS=$(OS)$(OS_VER) /bin/bash ./Install_RedisGears.sh
 	
 InstallOpenJDK:
 	/bin/bash ./Install_OpenJDK.sh
@@ -30,4 +32,4 @@ run_valgrind:
 	valgrind --leak-check=full --log-file=output.val redis-server --loadmodule ./bin/RedisGears/redisgears.so Plugin ./src/gears_jvm.so JvmOptions "-Djava.class.path=./gears_runtime/target/gear_runtime-jar-with-dependencies.jar" JvmPath ./bin/OpenJDK/jdk-11.0.9.1+1/
 
 pack: gears_jvm
-	OS=$(OS) GIT_BRANCH=$(GIT_BRANCH) VERSION=$(VERSION) ./pack.sh
+	OS=$(OS_NICK) GIT_BRANCH=$(GIT_BRANCH) VERSION=$(VERSION) ./pack.sh
