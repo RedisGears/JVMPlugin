@@ -62,7 +62,7 @@ jobs:
             command: OS=rhel OS_VER=7 make tests
         - run:
             name: Pack
-            command: make pack
+            command: OS=rhel OS_VER=7 make pack
         - persist_to_workspace:
             root: artifacts
             paths:
