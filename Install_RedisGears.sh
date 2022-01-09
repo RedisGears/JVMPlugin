@@ -4,11 +4,29 @@ then
       exit 1
 fi
 
+if [ -z ${ARCH+x} ]
+then
+      echo "arch is not set"
+      exit 1
+fi
+
+if [ -z ${DIST+x} ]
+then
+      echo "dist is not set"
+      exit 1
+fi
+
+if [ -z ${DIST_VERSION+x} ]
+then
+      echo "dist_version is not set"
+      exit 1
+fi
+
 echo "installing redisgears for :" $OS
 
 WORK_DIR=./bin/RedisGears/
-REDISGEARS_ZIP=redisgears.linux-$OS-x64.master.zip
-REDISGEARS_DEPS=redisgears-python.linux-$OS-x64.master.tgz
+REDISGEARS_ZIP=redisgears.$OS-$DIST$DIST_VERSION-$ARCH.master.zip
+REDISGEARS_DEPS=redisgears-python.$OS-$DIST$DIST_VERSION-$ARCH.master.tgz
 REDISGEARS_S3_PATH=http://redismodules.s3.amazonaws.com/redisgears/snapshots/$REDISGEARS_ZIP
 REDISGEARS_DEPS_S3_PATH=http://redismodules.s3.amazonaws.com/redisgears/snapshots/$REDISGEARS_DEPS
 
