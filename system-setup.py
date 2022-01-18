@@ -18,7 +18,6 @@ class JVMSetup(paella.Setup):
 
     def common_last(self):
         self.install("maven")
-        self.run("{PYTHON} {READIES}/bin/getredis -v 6.2".format(PYTHON=self.python, READIES=READIES))
         self.run("{PYTHON} {READIES}/bin/getrmpytools".format(PYTHON=self.python, READIES=READIES))
 
 #----------------------------------------------------------------------------------------------
