@@ -1,10 +1,20 @@
-DIST?=$(shell ./deps/readies/bin/platform --dist)
-DIST_VERSION?=$(shell ./deps/readies/bin/platform --version)
 OS?=$(shell uname -s)
 ARCH?=$(shell uname -m)
-OSNICK?=$(shell ./deps/readies/bin/platform --osnick)
+OSNICK?=$(shell ../../deps/readies/bin/platform --osnick)
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
-VERSION=$(shell ./getver)
+VERSION=$(shell ../../getver)
+
+ifndef PYTHONDIR
+$(error Specify the path to python as PYTHONDIR)
+endif
+
+ifeq ($(shell test -e ../../gears_python.so && echo yes),)
+$(error Build redisgears first)
+endif
+
+# in case you want to specifcy
+GEARSPYTHONLIB=$(shell readlink -f ../../gears_python.so)
+GEARSLIB=$(shell readlink -f ../../redisgears.so)
 
 $(info OS=$(OS))
 
@@ -31,15 +41,13 @@ clean:
 	make -C ./src/ clean
 
 tests: gears_jvm
-	cd ./pytest; ./run_test.sh ${PYTHONDIR}
+	cd ./pytest; ./run_test.sh ${PYTHONDIR} ${GEARSPYTHONLIB} ${GEARSLIB}
 
 run: gears_jvm
-	cp ../../redisgears.so ../../gears_python.so .
-	redis-server --loadmodule ./redisgears.so Plugin ./src/gears_jvm.so JvmOptions "-Djava.class.path=./gears_runtime/target/gear_runtime-jar-with-dependencies.jar" JvmPath ./bin/OpenJDK/jdk-11.0.9.1+1/
+	redis-server --loadmodule ${GEARSLIB} Plugin ./src/gears_jvm.so JvmOptions "-Djava.class.path=./gears_runtime/target/gear_runtime-jar-with-dependencies.jar" JvmPath ./bin/OpenJDK/jdk-11.0.9.1+1/
 
 run_valgrind:
-	cp ../../redisgears.so ../../gears_python.so .
-	valgrind --leak-check=full --log-file=output.val redis-server --loadmodule ./redisgears.so Plugin ./src/gears_jvm.so JvmOptions "-Djava.class.path=./gears_runtime/target/gear_runtime-jar-with-dependencies.jar" JvmPath ./bin/OpenJDK/jdk-11.0.9.1+1/
+	valgrind --leak-check=full --log-file=output.val redis-server --loadmodule ${GEARSLIB} Plugin ./src/gears_jvm.so JvmOptions "-Djava.class.path=./gears_runtime/target/gear_runtime-jar-with-dependencies.jar" JvmPath ./bin/OpenJDK/jdk-11.0.9.1+1/
 
 pack: gears_jvm
 	OS=$(OSNICK) GIT_BRANCH=$(GIT_BRANCH) VERSION=$(VERSION) ./pack.sh
