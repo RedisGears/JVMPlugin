@@ -16,6 +16,10 @@ class JVMSetup(paella.Setup):
         paella.Setup.__init__(self, nop=nop)
         self.with_python = with_python
 
+    def debian_compat(self):
+        if self.osnick == 'xenial':
+            self.install("openjdk-8-jdk")
+
     def common_last(self):
         self.install("maven")
         self.run("{PYTHON} {READIES}/bin/getrmpytools".format(PYTHON=self.python, READIES=READIES))
