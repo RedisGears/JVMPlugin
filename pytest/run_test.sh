@@ -28,7 +28,6 @@ GEARSLIB=$3
 GEARSJVM=../../src/gears_jvm.so
 shift 3
 
-set -x
 python3 -m RLTest --module ${GEARSLIB} --module-args "Plugin ${GEARSJVM} JvmPath $JVM_PATH JvmOptions $JVM_OPTIONS Plugin ${GEARSPYTHON} CreateVenv 0 PythonInstallationDir ${PYTHONDIR}" --clear-logs "$@"
 
 echo cluster 1 shard
