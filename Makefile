@@ -41,7 +41,7 @@ clean:
 	make -C ./src/ clean
 
 tests: gears_jvm
-	cd ./pytest; ./run_test.sh ${PYTHONDIR} ${GEARSPYTHONLIB} ${GEARSLIB}
+	cd ./pytest; ./run_test.sh ${PYTHONDIR} ${GEARSPYTHONLIB} ${GEARSLIB} --parallelism `nproc`
 
 run: gears_jvm
 	redis-server --loadmodule ${GEARSLIB} Plugin ./src/gears_jvm.so JvmOptions "-Djava.class.path=./gears_runtime/target/gear_runtime-jar-with-dependencies.jar" JvmPath ./bin/OpenJDK/jdk-11.0.9.1+1/
