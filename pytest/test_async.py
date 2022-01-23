@@ -50,3 +50,7 @@ def testAsyncRecrodForeachRaiseExcpetion(env, errs, **kargs):
     env.assertGreaterEqual(len(errs), 1)
     env.assertIn('java.lang.RuntimeException: error', errs[0])
     
+@jvmTestDecorator()
+def testAsyncStepInSyncExecution(env, results, errs, conn, **kargs):
+    env.assertEqual(len(errs), 0)
+    env.expect('RG.TRIGGER', 'test').equal(['done'])

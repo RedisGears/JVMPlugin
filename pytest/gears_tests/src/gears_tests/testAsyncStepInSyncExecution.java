@@ -14,6 +14,14 @@ public class testAsyncStepInSyncExecution {
 		GearsBuilder.CreateGearsBuilder(reader).
 		asyncMap(r->{
 			GearsFuture<Serializable> f = new GearsFuture<Serializable>();
+			new Thread(()->{
+				try {
+					f.setResult("done");
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}).start();
 			return f;
 		}).register(ExecutionMode.SYNC);
 		
