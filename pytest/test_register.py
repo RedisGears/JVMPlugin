@@ -252,11 +252,6 @@ def testCommandOverride(env, results, errs, conn, **kargs):
     env.assertEqual(conn.execute_command('hget', 'b1', 'time'), None)
 
 @jvmTestDecorator()
-def testAsyncStepInSyncExecution(env, results, errs, conn, **kargs):
-    env.assertEqual(len(errs), 0)
-    env.expect('RG.TRIGGER', 'test').error().contains('Can not create gearsFuture on sync execution')
-
-@jvmTestDecorator()
 def testKeysReaderCommandsOption(env, results, errs, conn, **kargs):
     env.assertEqual(len(errs), 0)
 
