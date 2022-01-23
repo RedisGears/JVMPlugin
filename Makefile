@@ -1,7 +1,8 @@
 OS?=$(shell uname -s)
 ARCH?=$(shell uname -m)
-OSNICK?=$(shell ../../deps/readies/bin/platform --osnick)
-GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
+DIST?=$(shell ../../deps/readies/bin/platform --dist)
+OSVER?=$(shell ../../deps/readies/bin/platform --osver)
+GIT_BRANCH=$(shell ../../getbranch)
 VERSION=$(shell ../../getver)
 
 ifndef PYTHONDIR
@@ -18,7 +19,7 @@ GEARSLIB=$(shell readlink -f ../../redisgears.so)
 
 $(info OS=$(OS))
 
-all: gears_jvm GearsRuntime
+all: gears_jvm GearsRuntime pack
 
 .PHONY: InstallOpenJDK
 
@@ -50,4 +51,4 @@ run_valgrind:
 	valgrind --leak-check=full --log-file=output.val redis-server --loadmodule ${GEARSLIB} Plugin ./src/gears_jvm.so JvmOptions "-Djava.class.path=./gears_runtime/target/gear_runtime-jar-with-dependencies.jar" JvmPath ./bin/OpenJDK/jdk-11.0.9.1+1/
 
 pack: gears_jvm
-	OS=$(OSNICK) GIT_BRANCH=$(GIT_BRANCH) VERSION=$(VERSION) ./pack.sh
+	OS=$(DIST)$(OSVER) GIT_BRANCH=$(GIT_BRANCH) VERSION=$(VERSION) ./pack.sh
