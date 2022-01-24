@@ -7,4 +7,4 @@
 
 JVM plugin for RedisGears
 
-This repository is now built as part of the [RedisGears](https://github.com/RedisGears/RedisGears) build and is no longer standalone. For now, it continues to be a separate repository.
+This repository is deprecated, and only historic. The code is now part of the [RedisGears](https://github.com/RedisGears/RedisGears) repositories.
